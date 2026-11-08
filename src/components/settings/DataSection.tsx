@@ -22,6 +22,8 @@ import { APP_VERSION_LABEL, formatBuildTime } from '../../lib/version';
 import { SCHEMA_VERSION } from '../../lib/types';
 import { QUOTE_COUNT } from '../../lib/quotes';
 import { readEndpoints } from '../../lib/endpoints';
+import { checkForUpdate } from '../../lib/updateCheck';
+import { useUpdateStore } from '../../lib/updateStore';
 
 /** 数据与关于 */
 export function DataSection() {
@@ -30,8 +32,33 @@ export function DataSection() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  /* 手动检查更新：与自动检查共用同一套逻辑，只是 force 绕过节流 */
+  const [checking, setChecking] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<{ ok: boolean; text: string } | null>(null);
   /* 隐私文案要按**实际开启的联网功能**生成：没配置的构建里不该出现对应描述 */
   const net = readEndpoints();
+
+  const checkUpdateNow = async () => {
+    if (checking) return;
+    setChecking(true);
+    setUpdateMessage(null);
+    try {
+      const r = await checkForUpdate({ force: true });
+      if (r.status === 'available' && r.manifest) {
+        // 交给全局弹层显示「发现新版本」，这里只给一句状态
+        useUpdateStore.getState().setPending(r.manifest, r.required === true);
+        setUpdateMessage({ ok: true, text: `发现新版本 v${r.manifest.versionName}` });
+      } else if (r.status === 'latest') {
+        setUpdateMessage({ ok: true, text: `已是最新版本 ${APP_VERSION_LABEL}` });
+      } else if (r.status === 'skipped') {
+        setUpdateMessage({ ok: false, text: '当前构建没有配置更新源，无法检查' });
+      } else {
+        setUpdateMessage({ ok: false, text: '检查失败：网络不通或服务暂时不可用，稍后再试' });
+      }
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const exportData = () => {
     const snapshot = store.exportSnapshot();
@@ -293,6 +320,34 @@ export function DataSection() {
           数据格式版本用于备份文件的兼容处理：更新后导入旧备份会自动升级，
           不会丢失内容。
         </p>
+        <div className="mt-3.5 border-t border-[var(--line)] pt-3">
+          <Button
+            variant="secondary"
+            icon={<RefreshCcw />}
+            onClick={() => void checkUpdateNow()}
+            disabled={checking}
+            block
+          >
+            {checking ? '检查中…' : '检查更新'}
+          </Button>
+          {updateMessage && (
+            <p
+              role="status"
+              aria-live="polite"
+              className="mt-2 rounded-xl px-3 py-2 text-[0.72rem]"
+              style={{
+                background: updateMessage.ok ? 'var(--ok-soft)' : 'var(--bad-soft)',
+                color: updateMessage.ok ? 'var(--ok)' : 'var(--bad)',
+              }}
+            >
+              {updateMessage.text}
+            </p>
+          )}
+          <p className="mt-2 text-[0.7rem] leading-relaxed text-tertiary">
+            平时打开 App 会自动检查（6 小时最多一次）；这里点一下会立即检查，
+            不受 6 小时限制。有新版本时会弹出下载提示。
+          </p>
+        </div>
       </Card>
 
       <Card padding="md">

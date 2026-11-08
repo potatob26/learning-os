@@ -196,6 +196,52 @@ console.log('\n=== ⑥ force 检查 ===');
   await ctx.close();
 }
 
+/* ========== ⑦ 设置页「检查更新」按钮：手动 force 检查 ========== */
+console.log('\n=== ⑦ 设置页手动检查 ===');
+{
+  const { ctx, page, requests } = await open({
+    repo: 'mock/owner',
+    release: latest('v9.9.9'),
+    seedCheckedAt: true,
+  });
+  await page.evaluate(() => {
+    location.hash = '#/settings/data';
+  });
+  const btn = page.getByRole('button', { name: '检查更新' });
+  await btn.waitFor({ state: 'visible', timeout: 5000 });
+  // 直接触发 click：避免更新公告等弹层挡住 pointer 事件（用例只验证按钮逻辑）
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) =>
+      (x.textContent ?? '').includes('检查更新'),
+    );
+    b?.click();
+  });
+  const dialog = page.getByRole('dialog', { name: /发现新版本/ });
+  await dialog.waitFor({ state: 'visible', timeout: 6000 }).catch(() => {});
+  const visible = await dialog.isVisible().catch(() => false);
+  check('点击「检查更新」能绕过 6 小时节流并弹出更新提示', visible);
+  check('手动检查确实发了请求', requests.length === 1, String(requests.length));
+  await ctx.close();
+}
+{
+  const { ctx, page } = await open({ repo: 'mock/owner', release: latest('v1.4.3') });
+  await page.evaluate(() => {
+    location.hash = '#/settings/data';
+  });
+  const btn = page.getByRole('button', { name: '检查更新' });
+  await btn.waitFor({ state: 'visible', timeout: 5000 });
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) =>
+      (x.textContent ?? '').includes('检查更新'),
+    );
+    b?.click();
+  });
+  await sleep(1500);
+  const latestText = await page.getByText(/已是最新版本/).first().isVisible().catch(() => false);
+  check('已是最新时显示「已是最新版本」', latestText);
+  await ctx.close();
+}
+
 await browser.close();
 const failed = results.filter((r) => !r).length;
 console.log(`\n===== ${results.length - failed}/${results.length} 通过 =====`);

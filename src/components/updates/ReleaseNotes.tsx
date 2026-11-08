@@ -24,7 +24,7 @@ export const RELEASE_NOTES_KEY = `learning-os:release-notes:${APP_VERSION}`;
  * ⚠️ 版本号不要手写：key 与标题都从 APP_VERSION 算（见文件顶部说明）。
  */
 const changes = [
-  ['进入软件会自动检查更新', '打开 App 后会安静地看一眼 GitHub 上有没有新版本（6 小时最多一次，没网也不打扰）。有新版本时弹出提示，点「下载并安装」会打开浏览器下载 APK，再由系统确认安装——安卓侧载不允许应用自己静默装完，这一步得你点一下。'],
+  ['设置里可以手动检查更新了', '设置 → 数据 → 「检查更新」点一下立即检查，不受 6 小时限制。有新版本会弹出下载提示；已经是最新会显示「已是最新版本」；网络不通时只提示检查失败，不会重复弹窗。'],
 ];
 
 export function ReleaseNotes() {

@@ -1,7 +1,7 @@
 {
   "name": "learning-os",
   "private": true,
-  "version": "1.4.3",
+  "version": "1.4.4",
   "type": "module",
   "description": "学生个人学习 OS — 今天该做什么、还能学多久、实际学了多少、距离目标还有多远",
   "scripts": {

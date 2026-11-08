@@ -17,9 +17,11 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        # 用 npm install 而不是 npm ci：lock 是在 Windows 上生成的，
-        # npm ci 在 Linux 上会漏装平台原生可选依赖（rollup/lightningcss/oxide）。
-        run: npm install --no-audit --no-fund
+        # lock 是在 Windows 上生成的，npm ci / npm install 都会沿用其中缺失的
+        # Linux 原生可选依赖；CI 里直接不用 lock，让 npm 按当前平台重新解析。
+        run: |
+          rm -f package-lock.json
+          npm install --no-audit --no-fund
 
       - name: Typecheck
         run: npx tsc -b

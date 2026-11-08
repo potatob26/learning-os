@@ -1,0 +1,65 @@
+# 依赖与构建产物
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# 本地缓存（本机 npm 缓存重定向到此目录，体积很大，不入库）
+.npm-cache/
+.pnpm-store/
+
+# 预览与截图产物（体积大，属于开发过程产物）
+.preview/
+
+# 环境变量
+.env
+.env.*
+!.env.example
+
+# 编辑器 / 系统
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# TypeScript 增量构建信息
+*.tsbuildinfo
+
+# ---------------- 安卓（Capacitor） ----------------
+# 注意：android/ 工程本身要入库（里面有图标、清单、包名等源文件），
+# 只忽略构建产物与本机配置。
+android/build/
+android/app/build/
+android/.gradle/
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/local.properties
+android/.idea/
+android/keystore.properties
+*.jks
+*.keystore
+
+# 构建出来的安装包（体积大，属于产物；保留在磁盘上但不入库）
+release/
+*.apk
+*.aab
+
+# 宣传片素材与工具（大体积媒体，不入库；说明见 Promo/素材说明.md）
+/Promo/
+
+# ���ػ���������ʾ���� .env.example��
+.env
+.env.local
+.env.*.local
+
+# 软著登记等个人法务材料：只留本机，不进代码仓库
+docs/软著材料/

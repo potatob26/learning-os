@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  小组件三：距离重要日期还有多久。
+  w_root 可点 → 换下一个重要日期；主题按钮在右上角。
+  主数字的字号由 provider 按尺寸分档设置（小 24sp / 中 36sp / 大 52sp），
+  这就是「调整比例 = 拉大拉小」的落地方式。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/w_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_card"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="34dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <TextView
+            android:id="@+id/w_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="11sp"
+            android:text="距离 重要日期" />
+
+        <TextView
+            android:id="@+id/w_main"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false"
+            android:text="—" />
+
+        <ImageView
+            android:id="@+id/w_rule"
+            android:layout_width="28dp"
+            android:layout_height="2dp"
+            android:layout_marginTop="4dp"
+            android:src="@drawable/widget_rule"
+            android:scaleType="fitXY"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/w_sub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="10sp"
+            android:text="" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/w_theme"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="top|end"
+        android:padding="12dp">
+
+        <ImageView
+            android:id="@+id/w_theme_dot"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/widget_dot"
+            android:contentDescription="切换主题" />
+    </FrameLayout>
+</FrameLayout>

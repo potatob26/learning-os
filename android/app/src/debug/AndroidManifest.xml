@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  只在 debug 构建里合并进来的清单（Android 的 debug source set）。
+  正式包不含这个 Activity，所以「小组件预览页」不会出现在用户的手机上。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".DebugWidgetPreviewActivity"
+            android:exported="true"
+            android:label="小组件预览（debug）" />
+    </application>
+</manifest>

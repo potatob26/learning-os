@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  小组件卡片底：纯白圆角矩形。
+
+  为什么是白色而不是直接写主题色：RemoteViews 的 setBackgroundColor 会把背景
+  换成 ColorDrawable，**圆角就没了**。所以这里画一个白色圆角形状，
+  运行时用 ImageView 的 setColorFilter 给它上色 —— 圆角保留，颜色还能每个
+  小组件实例不同（「每个小组件单独选主题」靠的就是这一点）。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FFFFFFFF" />
+    <corners android:radius="20dp" />
+</shape>

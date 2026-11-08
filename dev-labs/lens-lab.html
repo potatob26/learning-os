@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>毛玻璃 · 透镜实验室</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', system-ui, sans-serif;
+        background: #0b1020;
+        color: #fff;
+        padding: 16px;
+      }
+
+      /* 背景必须「有东西可折射」：细密网格 + 彩色光斑 + 细小文字。
+         在纯平滑渐变上，再正确的折射也看不出来。 */
+      .stage {
+        position: relative;
+        border-radius: 16px;
+        overflow: hidden;
+        background:
+          radial-gradient(50% 40% at 18% 14%, #4b7bff 0%, transparent 62%),
+          radial-gradient(45% 40% at 84% 26%, #29d3c0 0%, transparent 62%),
+          radial-gradient(60% 50% at 50% 96%, #a86bff 0%, transparent 66%),
+          linear-gradient(160deg, #0e1530, #131b38 55%, #0a0f22);
+        padding: 18px;
+      }
+      .grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(to right, rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.16) 1px, transparent 1px);
+        background-size: 26px 26px;
+      }
+      /* 细密文字：检验玻璃后的内容是否「可感知但不干扰」 */
+      .fineprint {
+        position: absolute;
+        inset: 0;
+        padding: 14px;
+        font-size: 10px;
+        line-height: 1.7;
+        color: rgba(255, 255, 255, 0.55);
+        letter-spacing: 0.02em;
+      }
+      .fineprint b { color: rgba(255, 255, 255, 0.85); font-weight: 600; }
+
+      .row { display: flex; gap: 14px; flex-wrap: wrap; position: relative; z-index: 2; }
+      .cell { flex: 1 1 220px; }
+      .cap {
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.5);
+        margin: 14px 0 6px;
+      }
+
+      .panel {
+        position: relative;
+        height: 156px;
+        border-radius: 22px;
+        overflow: hidden;
+        isolation: isolate;
+      }
+      .panel .txt {
+        position: relative;
+        z-index: 3;
+        padding: 16px;
+      }
+      .panel .big { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+      .panel .small { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+
+      /* ── A. 磨砂玻璃（对照）── */
+      .frosted {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(18px) saturate(1.5);
+        -webkit-backdrop-filter: blur(18px) saturate(1.5);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 三组滤镜：不同折射策略，用于对比 -->
+    <svg width="0" height="0" aria-hidden="true" style="position: absolute">
+      <!-- 噪音场 + 强位移（库默认思路） -->
+      <filter id="f-noise" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.006" numOctaves="2" seed="7" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="46" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+
+      <!-- 平滑低频率场 + 强位移：更接近「透镜」而非「随机扭曲」 -->
+      <filter id="f-lens-soft" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.0016" numOctaves="1" seed="3" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="52" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+
+      <!-- 色散：R/G/B 用不同强度的位移，制造边缘彩色分离 -->
+      <filter id="f-chroma" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.0016" numOctaves="1" seed="3" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="56" xChannelSelector="R" yChannelSelector="G" result="dR" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="52" xChannelSelector="R" yChannelSelector="G" result="dG" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="47" xChannelSelector="R" yChannelSelector="G" result="dB" />
+        <feColorMatrix in="dR" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="R" />
+        <feColorMatrix in="dG" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="G" />
+        <feColorMatrix in="dB" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="B" />
+        <feBlend in="R" in2="G" mode="screen" result="RG" />
+        <feBlend in="RG" in2="B" mode="screen" />
+      </filter>
+    </svg>
+
+    <h1 style="font-size: 17px; margin: 0 0 4px">毛玻璃 · 透镜实验室</h1>
+    <p style="font-size: 12px; opacity: 0.65; margin: 0 0 4px; line-height: 1.6">
+      关键不是「模糊多少」，而是：<b>模糊要小、透镜位移要大、边缘要有菲涅尔亮线</b>。
+      正确的话，玻璃后的网格会被明显拉伸弯折，且边缘比中心更亮 —— 而不是整体糊成一片。
+    </p>
+
+    <div class="stage">
+      <div class="grid"></div>
+      <div class="fineprint">
+        <b>背景参考文字</b> 这段细小文字用来检验玻璃后的内容是否可被感知但不干扰前景。
+        玻璃后方的文字应该仍然可辨认轮廓、但明显被光学扭曲；如果完全糊掉，说明模糊太重；
+        如果和没盖玻璃一样清晰，说明玻璃太薄。
+        网格线是最好的判据：透过玻璃时，网格应该被拉伸、加密或弯曲。
+      </div>
+
+      <div class="row" style="margin-top: 120px">
+        <div class="cell">
+          <div class="cap">A. 磨砂玻璃（对照，非液态）</div>
+          <div class="panel frosted">
+            <div class="txt"><div class="big">2h18m</div><div class="small">均匀模糊，网格完全糊掉</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="cell">
+          <div class="cap">B. 噪音强位移 + 小模糊</div>
+          <div class="panel" style="
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(3px) url(#f-noise) saturate(1.7) brightness(1.06);
+            -webkit-backdrop-filter: blur(3px) url(#f-noise) saturate(1.7) brightness(1.06);
+            border: 1px solid rgba(255,255,255,0.3);
+            box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.6), inset 0 0 0 1px rgba(255,255,255,0.14), 0 10px 30px rgba(0,0,0,0.35);
+          ">
+            <div class="txt"><div class="big">2h18m</div><div class="small">网格被随机扭曲</div></div>
+          </div>
+        </div>
+        <div class="cell">
+          <div class="cap">C. 低频平滑位移（更像透镜）</div>
+          <div class="panel" style="
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(3px) url(#f-lens-soft) saturate(1.7) brightness(1.06);
+            -webkit-backdrop-filter: blur(3px) url(#f-lens-soft) saturate(1.7) brightness(1.06);
+            border: 1px solid rgba(255,255,255,0.3);
+            box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.6), inset 0 0 0 1px rgba(255,255,255,0.14), 0 10px 30px rgba(0,0,0,0.35);
+          ">
+            <div class="txt"><div class="big">2h18m</div><div class="small">平滑拉伸，接近透镜</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="cell">
+          <div class="cap">D. 平滑位移 + 色散（边缘彩色分离）</div>
+          <div class="panel" style="
+            background: rgba(255,255,255,0.06);
+            backdrop-filter: blur(2.5px) url(#f-chroma) saturate(1.8) brightness(1.07);
+            -webkit-backdrop-filter: blur(2.5px) url(#f-chroma) saturate(1.8) brightness(1.07);
+            border: 1px solid rgba(255,255,255,0.32);
+            box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.65), inset 0 0 0 1px rgba(255,255,255,0.16), 0 10px 30px rgba(0,0,0,0.35);
+          ">
+            <div class="txt"><div class="big">2h18m</div><div class="small">边缘应有轻微 R/B 分离</div></div>
+          </div>
+        </div>
+        <div class="cell">
+          <div class="cap">E. D + 抑制整体白雾（更清澈）</div>
+          <div class="panel" style="
+            background: rgba(255,255,255,0.02);
+            backdrop-filter: blur(1.5px) url(#f-chroma) saturate(1.75) brightness(1.05) contrast(1.04);
+            -webkit-backdrop-filter: blur(1.5px) url(#f-chroma) saturate(1.75) brightness(1.05) contrast(1.04);
+            border: 1px solid rgba(255,255,255,0.34);
+            box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.7), inset 0 0 0 1px rgba(255,255,255,0.18), inset 0 -20px 30px -22px rgba(255,255,255,0.3), 0 10px 30px rgba(0,0,0,0.35);
+          ">
+            <div class="txt"><div class="big">2h18m</div><div class="small">几乎没有白雾，靠光学变化</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="probe" style="margin-top: 14px; font-family: ui-monospace, monospace; font-size: 11px; line-height: 1.8; opacity: 0.8"></div>
+
+    <script>
+      const supports = (v) => CSS.supports('backdrop-filter', v);
+      const lines = [
+        ['backdrop-filter: url() 支持', supports('url("#f-noise")')],
+        ['同时支持 blur + url', supports('blur(3px) url("#f-noise")')],
+        ['用户代理', navigator.userAgent.slice(0, 80)],
+      ];
+      document.getElementById('probe').innerHTML = lines
+        .map(([k, v]) => `${k}: <b style="color:${v === true ? '#6ee7a8' : v === false ? '#ff8f8f' : '#fff'}">${v === true ? '是' : v === false ? '否' : v}</b>`)
+        .join('<br>');
+      window.__LENS_PROBE__ = { supportsUrl: supports('url("#f-noise")'), supportsBoth: supports('blur(3px) url("#f-noise")') };
+    </script>
+  </body>
+</html>

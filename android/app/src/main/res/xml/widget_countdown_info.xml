@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  距离重要日期还有多久。2×1 起步，可拉伸（字号按尺寸分档 = 「调整比例」）。
+
+  updatePeriodMillis=1800000（30 分钟，系统允许的最小值）：
+  这个小组件**需要**定时刷新 —— 「还有几天」是原生本地算的，跨天后即使一整天
+  没打开 App，桌面上的天数也应该是对的。30 分钟一次的开销可以忽略。
+  注意这里只重画已有的数据，不会去启动 WebView。
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_countdown"
+    android:previewLayout="@layout/widget_countdown"
+    android:previewImage="@mipmap/ic_launcher"
+    android:description="@string/widget_countdown_desc"
+    android:widgetCategory="home_screen" />

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Liquid Glass 方案对比</title>
+    <link rel="stylesheet" href="/node_modules/@dpawlikowski/liquid-glass/src/core/liquid-glass.css" />
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', system-ui, sans-serif;
+        color: #fff;
+        min-height: 100vh;
+      }
+
+      /* 一个真实的复杂背景：既有渐变也有细节，用来检验折射是否真实发生 */
+      .scene {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        background:
+          radial-gradient(60% 45% at 20% 20%, #6d8cff 0%, transparent 60%),
+          radial-gradient(55% 45% at 82% 26%, #42d6c8 0%, transparent 62%),
+          radial-gradient(70% 55% at 50% 92%, #b07bff 0%, transparent 66%),
+          linear-gradient(150deg, #0d1226, #131a33 55%, #0a0f1f);
+      }
+      /* 高频细节：折射是否真实，看这些条纹有没有被弯曲 */
+      .stripes {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        background: repeating-linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.16) 0 2px,
+          transparent 2px 22px
+        );
+      }
+      .grid-lines {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        background-image:
+          linear-gradient(to right, rgba(255, 255, 255, 0.22) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
+        background-size: 48px 48px;
+      }
+
+      .wrap { position: relative; z-index: 2; padding: 28px 20px 80px; max-width: 900px; margin: 0 auto; }
+      h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.02em; }
+      .hint { font-size: 13px; opacity: 0.75; margin: 0 0 22px; line-height: 1.6; }
+      h2 { font-size: 15px; margin: 30px 0 10px; opacity: 0.92; }
+      .row { display: flex; flex-wrap: wrap; gap: 16px; }
+      .cell { flex: 1 1 240px; min-width: 0; }
+      .label { font-size: 12px; opacity: 0.7; margin-bottom: 6px; }
+
+      /* 旧的普通毛玻璃，作为对照 */
+      .old-glass {
+        padding: 18px;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.14);
+        backdrop-filter: blur(22px) saturate(150%);
+        -webkit-backdrop-filter: blur(22px) saturate(150%);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+      }
+
+      .probe {
+        margin-top: 22px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.45);
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.9;
+        white-space: pre-wrap;
+      }
+      .ok { color: #6ee7a8; }
+      .no { color: #ff8f8f; }
+      strong { font-weight: 600; }
+      p { margin: 6px 0; font-size: 14px; line-height: 1.65; }
+    </style>
+  </head>
+  <body>
+    <div class="scene"></div>
+    <div class="grid-lines"></div>
+    <div class="stripes"></div>
+
+    <div class="wrap">
+      <h1>Liquid Glass 方案对比</h1>
+      <p class="hint">
+        背景故意做成高对比 + 高频细节（条纹 + 网格）。<strong>如果玻璃边缘附近的条纹发生弯曲，说明折射真实生效</strong>；
+        如果条纹笔直穿过玻璃，那只是普通毛玻璃。
+      </p>
+
+      <h2>1. 当前实现（普通毛玻璃，对照组）</h2>
+      <div class="row">
+        <div class="cell">
+          <div class="label">blur + saturate，无折射</div>
+          <div class="old-glass">
+            <strong>今日学习 2h18m</strong>
+            <p>文字应当非常清晰。注意条纹穿过时是直的。</p>
+          </div>
+        </div>
+      </div>
+
+      <h2>2. @dpawlikowski/liquid-glass</h2>
+      <div class="row">
+        <div class="cell">
+          <div class="label">vivid（默认折射）</div>
+          <div class="liquid-glass liquid-glass--vivid" style="padding: 18px">
+            <div class="liquid-glass__content">
+              <strong>今日学习 2h18m</strong>
+              <p>条纹在边缘附近应当被弯曲。</p>
+            </div>
+          </div>
+        </div>
+        <div class="cell">
+          <div class="label">subtle（弱折射）</div>
+          <div class="liquid-glass liquid-glass--subtle" style="padding: 18px">
+            <div class="liquid-glass__content">
+              <strong>课后可支配 3h35m</strong>
+              <p>更克制的版本。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h2>3. 中性边缘 + 降低奶白（本项目目标：安静、透明、无彩虹）</h2>
+      <div class="row">
+        <div class="cell">
+          <div class="label">opacity .30 / blur 14 / saturate 150 / 白色边缘</div>
+          <div
+            class="liquid-glass liquid-glass--vivid"
+            style="padding: 18px; --lg-opacity: 0.30; --lg-blur: 14px; --lg-saturate: 150%; --lg-edge-red: rgb(255 255 255 / 0.5); --lg-edge-cyan: rgb(255 255 255 / 0.34)"
+          >
+            <div class="liquid-glass__content">
+              <strong>数学 ✓ 已上完</strong>
+              <p>背景色能透进来，条纹在边缘弯曲，文字仍然锐利。</p>
+            </div>
+          </div>
+        </div>
+        <div class="cell">
+          <div class="label">opacity .22 / blur 18（更通透）</div>
+          <div
+            class="liquid-glass liquid-glass--subtle"
+            style="padding: 18px; --lg-opacity: 0.22; --lg-blur: 18px; --lg-saturate: 145%; --lg-edge-red: rgb(255 255 255 / 0.42); --lg-edge-cyan: rgb(255 255 255 / 0.28)"
+          >
+            <div class="liquid-glass__content">
+              <strong>课后可支配 3h35m</strong>
+              <p>环境色影响更明显。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h2>4. 折射强度对比（同一透明度，只改 displacement scale）</h2>
+      <p class="hint" id="scale-note">
+        先注入一个 scale=8 的滤镜，并把左侧卡片指向它。
+      </p>
+      <div class="row">
+        <div class="cell">
+          <div class="label">scale 8（克制）</div>
+          <div
+            class="liquid-glass liquid-glass--subtle"
+            id="lg-scale-low"
+            style="padding: 18px; --lg-opacity: 0.26; --lg-blur: 14px; --lg-edge-red: rgb(255 255 255 / 0.45); --lg-edge-cyan: rgb(255 255 255 / 0.3)"
+          >
+            <div class="liquid-glass__content"><strong>scale 8</strong><p>看边缘条纹弯曲幅度</p></div>
+          </div>
+        </div>
+        <div class="cell">
+          <div class="label">scale 21（库默认）</div>
+          <div
+            class="liquid-glass liquid-glass--subtle"
+            style="padding: 18px; --lg-opacity: 0.26; --lg-blur: 14px; --lg-edge-red: rgb(255 255 255 / 0.45); --lg-edge-cyan: rgb(255 255 255 / 0.3)"
+          >
+            <div class="liquid-glass__content"><strong>scale 21</strong><p>更明显的液体感</p></div>
+          </div>
+        </div>
+      </div>
+
+      <h2>5. 文字清晰度压力测试（玻璃压在细密文字上）</h2>
+      <div style="position: relative; height: 190px">
+        <div style="position: absolute; inset: 0; font-size: 11px; line-height: 1.55; opacity: 0.9">
+          这是一段用来测试折射玻璃后方文字可读性的细密文字。如果玻璃的折射或奶白色过强，
+          这段文字会变得完全看不清。Apple 的 Liquid Glass 要求玻璃后的内容可以被感知但不干扰前景。
+          这段文字故意排得很密，字号很小，用来暴露问题。
+          折射应该让背景产生光学变化，而不是把背景糊成一团不可辨识的东西。
+        </div>
+        <div
+          class="liquid-glass liquid-glass--vivid"
+          style="position: absolute; inset: 0; --lg-opacity: 0.30; --lg-blur: 14px; --lg-saturate: 150%; --lg-edge-red: rgb(255 255 255 / 0.5); --lg-edge-cyan: rgb(255 255 255 / 0.34)"
+        >
+          <div class="liquid-glass__content" style="padding: 16px">
+            <strong style="font-size: 15px">前方的文字必须极其清晰</strong>
+            <p style="font-size: 13px">Today studied 2h 18m · Available 3h 35m</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="probe" id="probe">检测中…</div>
+    </div>
+
+    <script type="module">
+      import { injectLiquidGlassFilter } from '/node_modules/@dpawlikowski/liquid-glass/src/index.js';
+
+      injectLiquidGlassFilter({ animate: true });
+
+      // 注入第二个滤镜（scale=8），让左卡片指向它，对比折射强度
+      import('/node_modules/@dpawlikowski/liquid-glass/src/index.js').then((m) => {
+        try {
+          m.injectLiquidGlassFilter({ id: 'lg-filter-low', scale: 8, animate: true });
+          const el = document.getElementById('lg-scale-low');
+          if (el) el.style.setProperty('--lg-filter', 'url("#lg-filter-low")');
+          const note = document.getElementById('scale-note');
+          if (note) note.textContent = '左侧使用独立注入的 scale=8 滤镜，右侧使用库默认 scale=21。';
+        } catch (e) {
+          const note = document.getElementById('scale-note');
+          if (note) note.textContent = '第二个滤镜注入失败：' + e.message;
+        }
+      });
+
+      const supportsSvgInBackdrop = CSS.supports(
+        'backdrop-filter',
+        'url("#liquid-glass-filter")',
+      );
+      const supportsWebkitSvgInBackdrop = CSS.supports(
+        '-webkit-backdrop-filter',
+        'url("#liquid-glass-filter")',
+      );
+      const supportsBackdrop = CSS.supports('backdrop-filter', 'blur(4px)');
+
+      // 检测实际生效的是哪种模式：live backdrop 模式下 sprite 会被 display:none
+      const el = document.querySelector('.liquid-glass--vivid');
+      const sprite = el?.querySelector('.liquid-glass__refraction');
+      const spriteDisplay = sprite ? getComputedStyle(sprite).display : '（无 sprite 元素）';
+      const computedBackdrop = el ? getComputedStyle(el).backdropFilter || getComputedStyle(el).webkitBackdropFilter : '-';
+
+      // 用 canvas 读取像素，验证边缘是否真的发生位移（折射）
+      function sampleRefraction() {
+        // 在玻璃上边缘内侧取一条水平线，看条纹位置是否与背景不一致
+        return 'n/a';
+      }
+
+      const lines = [
+        ['backdrop-filter: blur() 支持', supportsBackdrop],
+        ['backdrop-filter: url(#filter) 支持', supportsSvgInBackdrop],
+        ['-webkit-backdrop-filter: url(#filter) 支持', supportsWebkitSvgInBackdrop],
+        ['→ 判定模式', supportsSvgInBackdrop || supportsWebkitSvgInBackdrop ? 'LIVE BACKDROP（真·实时折射）' : 'SPRITE FALLBACK（静态贴图折射）'],
+        ['.liquid-glass__refraction display', spriteDisplay],
+        ['计算后的 backdrop-filter', String(computedBackdrop).slice(0, 90)],
+        ['用户代理', navigator.userAgent.slice(0, 110)],
+        ['硬件并发 / 内存', `${navigator.hardwareConcurrency ?? '?'} 核 / ${navigator.deviceMemory ?? '?'} GB`],
+      ];
+
+      document.getElementById('probe').innerHTML = lines
+        .map(([k, v]) => {
+          const isBool = typeof v === 'boolean';
+          const cls = isBool ? (v ? 'ok' : 'no') : '';
+          return `<span class="${cls}">${k}: ${isBool ? (v ? '是' : '否') : v}</span>`;
+        })
+        .join('\n');
+
+      // 暴露给自动化测试
+      window.__GLASS_PROBE__ = {
+        supportsBackdrop,
+        supportsSvgInBackdrop,
+        supportsWebkitSvgInBackdrop,
+        liveBackdrop: supportsSvgInBackdrop || supportsWebkitSvgInBackdrop,
+        spriteDisplay,
+        computedBackdrop: String(computedBackdrop),
+        sampleRefraction,
+      };
+    </script>
+  </body>
+</html>

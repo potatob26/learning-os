@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Liquid Glass — 液态玻璃实验室</title>
+  <meta name="description" content="拖动圆角玻璃，实时探索折射、高光与色散。可复用的液态玻璃 Web Component。">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='3' y='3' width='34' height='34' rx='12' fill='%231a7775'/%3E%3Crect x='10' y='10' width='20' height='20' rx='7' fill='none' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <!-- Classic deferred scripts also work when this file is opened directly with file://. -->
+  <script defer src="liquid-glass.js"></script>
+  <script defer src="shapes.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="./" aria-label="液态玻璃首页"><span class="brand-icon"><i></i></span><strong>Liquid Glass<span class="brand-divider">/</span><span class="brand-sub">实验室</span></strong></a><div class="header-actions"><span class="version">COMPONENT 02</span><a class="export" href="liquid-glass.js" download><svg viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 15v5h14v-5"/></svg>下载组件</a></div></header>
+  <main>
+    <div class="intro"><div><div class="eyebrow">MATERIAL PLAYGROUND</div><h1>光，变成可触摸的形状<span>。</span></h1><p>在背景上拖动玻璃，探索每一道折射。</p></div><div class="material-tag"><span class="tiny-square"></span>液态玻璃<span class="tag-sep">·</span><span id="shape-name">圆角矩形</span></div></div>
+    <div class="lab">
+      <section class="stage-wrap" aria-label="玻璃拖动体验区">
+        <div id="stage" class="stage"><canvas id="scene" aria-hidden="true"></canvas><div class="stage-top"><span class="live-label"><i></i>实时预览</span><button id="recenter" class="stage-button" title="居中玻璃"><svg viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M12 8v8m-4-4h8"/></svg><span>居中</span></button></div><liquid-glass id="glass" size="240" radius="64" refraction="55" blur="1" chromatic tabindex="0" role="group" aria-label="可拖动液态玻璃。方向键移动，Shift 加方向键快速移动。"><div class="glass-content"><svg viewBox="0 0 48 48"><path d="M24 7c0 10-7 17-17 17 10 0 17 7 17 17 0-10 7-17 17-17-10 0-17-7-17-17Z"/><path d="M38 4v10M33 9h10"/></svg><strong>Liquid Glass</strong><span>随光而动</span></div></liquid-glass><div class="stage-bottom"><span>按住拖动，或使用方向键</span><span id="coordinates">X 000 · Y 000</span></div></div>
+        <div class="background-bar"><span class="bar-label">背景</span><div class="background-options" role="group" aria-label="切换背景"><button class="background-choice selected" data-scene="flow" aria-pressed="true"><i class="thumb flow"></i>流光</button><button class="background-choice" data-scene="spectrum" aria-pressed="false"><i class="thumb spectrum"></i>光谱</button><button class="background-choice" data-scene="grid" aria-pressed="false"><i class="thumb grid"></i>网格</button></div><span class="background-note">移动，看见不同</span></div>
+      </section>
+      <aside class="controls"><div class="panel-title"><h2>玻璃参数</h2><button id="reset" class="text-button">重置<svg viewBox="0 0 24 24"><path d="M4 5v6h6M5 10a8 8 0 1 1 1 8"/></svg></button></div><section class="shape-section" aria-label="自定义玻璃形状">
+  <div class="shape-heading"><span>形状</span><span class="shape-hint">选一种，或自己画</span></div>
+  <div class="shape-options" role="group" aria-label="形状预设">
+    <button data-shape="rounded" aria-pressed="true" class="selected"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/></svg>圆角</button>
+    <button data-shape="ellipse" aria-pressed="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>圆形</button>
+    <button data-shape="capsule" aria-pressed="false"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="6"/></svg>胶囊</button>
+    <button data-shape="diamond" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="m12 2 10 10-10 10L2 12Z"/></svg>菱形</button>
+    <button data-shape="hexagon" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M7 3h10l5 9-5 9H7l-5-9Z"/></svg>六边形</button>
+    <button data-shape="star" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="m12 2 3 6 7 2-5 5 1 7-6-3-6 3 1-7-5-5 7-2Z"/></svg>星形</button>
+    <button data-shape="custom" aria-pressed="false" class="custom-shape-button"><svg viewBox="0 0 24 24"><path d="m5 4 14 2-2 13-14-4Z"/><circle cx="5" cy="4" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="17" cy="19" r="2"/><circle cx="3" cy="15" r="2"/></svg>自定义轮廓</button>
+  </div>
+  <div id="custom-editor" hidden>
+    <p class="editor-help">拖动顶点改变轮廓；选中后也可用方向键微调。</p>
+    <svg id="outline-editor" class="outline-editor" viewBox="0 0 100 100" aria-label="自定义轮廓顶点编辑器"><path id="editor-outline"/><g id="editor-nodes"></g></svg>
+    <div class="editor-actions"><button id="point-add" type="button">＋ 加点</button><button id="point-remove" type="button">－ 删点</button><span id="point-count">5 / 12</span></div>
+    <p id="editor-status" class="editor-status" role="status" aria-live="polite">已选顶点 1</p>
+  </div>
+</section><div class="preset-label">材质</div><div class="presets" role="group" aria-label="材质预设"><button data-preset="clear" class="active" aria-pressed="true">通透</button><button data-preset="soft" aria-pressed="false">柔雾</button><button data-preset="lens" aria-pressed="false">透镜</button></div>
+        <div class="sliders"><label class="control"><span>宽度<output id="width-value">240 <small>px</small></output></span><input id="width" type="range" min="120" max="420" value="240" aria-label="玻璃宽度"><span class="range-extents"><small>小</small><small>大</small></span></label><label class="control"><span>高度<output id="height-value">240 <small>px</small></output></span><input id="height" type="range" min="120" max="420" value="240" aria-label="玻璃高度"><span class="range-extents"><small>低</small><small>高</small></span></label><label class="control" id="radius-control"><span>圆角 <output id="radius-value">64 <small>px</small></output></span><input id="radius" type="range" min="0" max="110" value="64"><span class="range-extents"><small>利落</small><small>圆润</small></span></label><label class="control"><span>折射强度 <output id="refraction-value">55 <small>%</small></output></span><input id="refraction" type="range" min="0" max="100" value="55"><span class="range-extents"><small>平静</small><small>流动</small></span></label><label class="control"><span>雾化程度 <output id="blur-value">1 <small>px</small></output></span><input id="blur" type="range" min="0" max="12" step="0.5" value="1"><span class="range-extents"><small>清晰</small><small>朦胧</small></span></label></div>
+        <div class="switches"><label>边缘色散 <input id="chromatic" type="checkbox" checked role="switch"><span class="switch"></span></label><label>显示内容 <input id="content" type="checkbox" checked role="switch"><span class="switch"></span></label></div><div class="panel-note"><svg viewBox="0 0 24 24"><path d="m8 5-6 7 6 7m8-14 6 7-6 7m-3-16-2 18"/></svg><div><strong>一块玻璃，多种可能</strong><p>独立组件，可嵌入你的网页项目。</p><button id="usage-open">查看接入方式 <span>↗</span></button></div></div>
+      </aside>
+    </div>
+    <footer><span>折射 · 色散 · 边缘高光</span><span>Inspired by Apple Liquid Glass <i></i> Built for the web</span></footer>
+  </main>
+  <dialog id="usage"><div class="dialog-head"><div><span class="eyebrow">MAKE IT YOURS</span><h2>把玻璃带到你的项目</h2></div><button id="usage-close" aria-label="关闭">×</button></div><p>下载组件后，使用原生 Web Component，无需安装依赖，也可以直接双击打开本演示页。</p><pre><code>&lt;script defer src="./liquid-glass.js"&gt;&lt;/script&gt;
+&lt;div style="position:relative;height:500px"&gt;
+  &lt;liquid-glass width="280" height="200"
+    shape="rounded" radius="48" draggable&gt;
+    你的内容
+  &lt;/liquid-glass&gt;
+&lt;/div&gt;</code></pre><p>默认使用背景模糊与玻璃高光，可放在普通网页内容上。需要本页的精准折射时，将背景 Canvas 传入组件：</p><pre><code>glass.source = backgroundCanvas;
+glass.setPosition(100, 100);
+// 背景更新后重新渲染
+glass.render();</code></pre><p>shape 支持 rounded、ellipse、capsule、diamond、hexagon、star 和 custom。自定义轮廓使用 0–100 的坐标，按轮廓顺序填写 3–16 个顶点：</p><pre><code>&lt;liquid-glass width="280" height="220" shape="custom"
+  points="15,10 85,10 95,60 60,95 10,80"&gt;
+&lt;/liquid-glass&gt;</code></pre><button id="copy-config" class="export" type="button">复制当前形状代码</button><p id="copy-status" role="status"></p><p class="usage-note">Canvas 需与父容器对齐并覆盖父容器，使用可读取的本地或跨域授权图片。网页实现模拟液态玻璃，并非 Apple 原生材质；WebGL 不可用时自动回退。</p><a class="export" href="liquid-glass.js" download>下载 liquid-glass.js</a></dialog>
+</body></html>

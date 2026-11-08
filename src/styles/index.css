@@ -1,0 +1,1849 @@
+/* 毛玻璃库的基础样式。
+   必须在层（layer）之外、且在 @layer utilities 之前导入：
+   库的样式是无层级的，会输给任何 @layer 里的规则，
+   所以我方在 @layer utilities 里的调校总能覆盖它。 */
+@import '@dpawlikowski/liquid-glass/css';
+
+@import 'tailwindcss';
+
+/* ==========================================================================
+   Tailwind 扫描范围
+   ──────────────────────────────────────────────────────────────────────────
+   Tailwind v4 默认**不扫描 node_modules**，只会为项目源码里出现过的类名生成样式。
+
+   liquid-glass-react 是编译产物，它的类名写在 node_modules 里，因此
+   `opacity-0` / `opacity-20` / `opacity-100` / `mix-blend-overlay` / `duration-150`
+   这些类名原本一个都不会生成。后果很隐蔽但很严重：
+     它内部有两个 `bg-black` 图层靠 `opacity-0` 隐藏，
+     而 `bg-black` 因为项目别处用过 `bg-black/45` 被生成出来了 ——
+     黑底有了、透明度没有 → 整块玻璃渲染成**不透明黑条**。
+
+   用 @source 把该库的产物目录纳入扫描，类名补齐后图层才会按设计隐藏。
+   这是「环境配置」问题，不是库坏了（它在官方 demo 上工作正常，已实测）。
+   ========================================================================== */
+@source '../../node_modules/liquid-glass-react/dist';
+
+/* ==========================================================================
+   学习 OS — Design System
+   基调：柔和通透（大留白 · 大圆角 · 极淡层次 · 安静）
+   规则：颜色只在这里定义，组件里禁止写死颜色。
+   ========================================================================== */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------- 1. 固定调色板（Design Tokens 的唯一来源） ---------- */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'HarmonyOS Sans SC', 'Noto Sans SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Source Han Sans SC', system-ui, sans-serif;
+  --font-display: 'SF Pro Display', -apple-system, BlinkMacSystemFont,
+    'PingFang SC', 'HarmonyOS Sans SC', system-ui, sans-serif;
+
+  --radius-card: 1.25rem;
+
+  /* 主题强调色会覆盖 --color-accent-* */
+  --color-accent-50: #eff6ff;
+  --color-accent-100: #dbeafe;
+  --color-accent-200: #bfdbfe;
+  --color-accent-400: #60a5fa;
+  --color-accent-500: #3b82f6;
+  --color-accent-600: #2563eb;
+  --color-accent-700: #1d4ed8;
+
+  --color-ok-500: #34c98a;
+  --color-ok-600: #12a06a;
+  --color-warn-500: #f2a83b;
+  --color-warn-600: #d3871a;
+  --color-bad-500: #ef6b6b;
+  --color-bad-600: #d94f4f;
+
+  --ease-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 独立液态玻璃演示的原始流光调色板；Canvas 与缩略图共同使用。 */
+@theme static {
+  --color-flow-ink: #0b152c;
+  --color-flow-sea: #183e56;
+  --color-flow-teal: #147982;
+  --color-flow-deep: #023449;
+  --color-flow-sand: #ddbd85;
+  --color-flow-cream: #f3d3aa;
+  --color-flow-copper: #ca6333;
+  --color-flow-plum: #512c42;
+  --color-flow-aqua: #44c8d5;
+  --color-flow-foam: #5bbdc3;
+  --color-flow-shade: #030d2566;
+}
+
+/* ---------- 2. 语义层：随主题 / 深浅模式切换 ---------- */
+:root {
+  color-scheme: light;
+
+  --bg-base: #f6f7f9;
+  --bg-elevated: #ffffff;
+
+  --surface: rgb(255 255 255 / 0.78);
+  --surface-strong: rgb(255 255 255 / 0.92);
+  --surface-soft: rgb(255 255 255 / 0.5);
+  --surface-hover: rgb(255 255 255 / 0.96);
+  --surface-sunken: rgb(15 23 42 / 0.04);
+
+  --text: #101828;
+  /* 二级/三级文字的不透明度整体上调：
+     原来三级只有 0.42，实测在玻璃上对比度低到 2.3~3.9:1，
+     手机上确实看不清（用户反馈「文字显示不清楚」）。
+     上调后三级约 4.5:1、二级约 7:1，同时仍与正文保持层次差。 */
+  --text-secondary: rgb(16 24 40 / 0.74);
+  --text-tertiary: rgb(16 24 40 / 0.62);
+  --text-invert: #ffffff;
+
+  --line: rgb(16 24 40 / 0.08);
+  --line-strong: rgb(16 24 40 / 0.14);
+  /* 全屏遮罩（复燃动画等需要压暗底层的场景）。深色主题下更沉一点 */
+  --scrim: rgb(16 24 40 / 0.45);
+
+  --accent: var(--color-accent-500);
+  --accent-strong: var(--color-accent-600);
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --accent-ring: color-mix(in srgb, var(--accent) 34%, transparent);
+  /* 压在 accent 浅底上的文字色。
+     --accent 本身是**填充色**，当小字压在自家浅底上时对比度只有约 3:1（浅色主题），
+     达不到 4.5:1。这里按固定比例往黑里压，实测可到 4.8~5.4:1。
+     用 color-mix 从 --accent 派生而不是写死色值，这样任何主题换了 accent
+     都能自动得到合规的深色版本。 */
+  --accent-on-soft: color-mix(in srgb, var(--accent) 56%, #000);
+  /* 主按钮（accent 实底）的底色与其上的文字色。
+     为什么不能只改文字色：浅色主题的 accent 是**中间调**，白字 3.84:1、
+     深字 4.31:1，两个都够不到 4.5 —— 必须把底色压深一档。
+     深色主题的 accent 是浅色，反过来要用深字（iOS 风格），可达约 9:1。 */
+  --primary-bg: var(--accent-strong);
+  --primary-bg-hover: var(--color-accent-700);
+  --on-accent: #ffffff;
+  /* 危险按钮（--bad 实底）同理：白字压原生 --bad-600 实测只有 4.05:1，
+     差一点点，按同一比例往深里压一档即可达标；color-mix 保证换主题也自动跟随。 */
+  --danger-bg: color-mix(in srgb, var(--bad) 82%, #000);
+  --danger-bg-hover: color-mix(in srgb, var(--bad) 68%, #000);
+  --on-danger: #ffffff;
+  /* 日历 / 热力图的热力梯度。
+     上限必须封顶：把 accent 当大块填充用到 90% 时底色会落到中间调，
+     压在上面的文字无论浅色深色都不够（实测浅色主题 3.70:1）。
+     浅色主题用深字，上限取 62%（实测约 4.9:1）；
+     深色主题用浅字，上限取 34%（实测约 5.0:1）。 */
+  --heat-0: var(--surface-sunken);
+  --heat-1: color-mix(in srgb, var(--accent) 14%, transparent);
+  --heat-2: color-mix(in srgb, var(--accent) 28%, transparent);
+  --heat-3: color-mix(in srgb, var(--accent) 44%, transparent);
+  --heat-4: color-mix(in srgb, var(--accent) 62%, transparent);
+
+  --ok: var(--color-ok-600);
+  --ok-soft: color-mix(in srgb, var(--color-ok-500) 14%, transparent);
+  --warn: var(--color-warn-600);
+  --warn-soft: color-mix(in srgb, var(--color-warn-500) 16%, transparent);
+  --bad: var(--color-bad-600);
+  --bad-soft: color-mix(in srgb, var(--color-bad-500) 14%, transparent);
+  --info: #2f7fd6;
+  --info-soft: color-mix(in srgb, #2f7fd6 13%, transparent);
+
+  /* 文字专用的状态色。
+     --ok / --warn / --bad 是**填充色**，直接当小字压在自家 soft 底上不够：
+     浅色主题实测 ok 2.98:1、warn 2.58:1、bad 3.47:1（都不到 4.5）。
+     这里从同一个基色往黑里压 40%，换主题时会自动跟随新的 --ok / --warn。
+     深色主题正好相反（原色是浅色，压深反而更糟），在 :root.dark 里直接 alias。 */
+  --ok-text: color-mix(in srgb, var(--ok) 60%, #000);
+  --warn-text: color-mix(in srgb, var(--warn) 60%, #000);
+  --bad-text: color-mix(in srgb, var(--bad) 60%, #000);
+  --info-text: color-mix(in srgb, var(--info) 58%, #000);
+  /* accent 当文字时沿用 accent-on-soft（压暗一档） */
+  --accent-text: var(--accent-on-soft);
+  /* 实底 --ok 上的文字（完成勾选等） */
+  --on-ok: #ffffff;
+
+  --glass-blur: 22px;
+  --glass-sat: 150%;
+  --glass-alpha: 1;
+  /* 透明玻璃边框：单一均匀发丝线（用户定稿，对照参考图一）。
+     盖在 vendor 着色器的方向性边缘之上，把亮度不均统一成一条细线。 */
+  --refract-line: rgb(255 255 255 / 0.55);
+
+  /* 毛玻璃参数（一级材质）。库的默认 0.58 太奶白，这里压到能透出背景色 */
+  --lg-op: 0.3;
+  --lg-blur-px: 14px;
+  --lg-sat: 150%;
+  --lg-tint-rgb: 255 255 255;
+
+  --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.05);
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.04), 0 4px 12px -4px rgb(16 24 40 / 0.08);
+  --shadow-md: 0 2px 4px rgb(16 24 40 / 0.04), 0 12px 28px -8px rgb(16 24 40 / 0.12);
+  --shadow-lg: 0 4px 8px rgb(16 24 40 / 0.05), 0 24px 48px -12px rgb(16 24 40 / 0.16);
+
+  /* 背景层：暗化 / 亮化遮罩强度（保证文字永远可读） */
+  --bg-veil: 0.42;
+  --bg-veil-color: 255 255 255;
+  /* 主题色偏：让每套主题有自己的气质，而不是同一套背景换名字 */
+  --bg-tint: transparent;
+  /* 背景细节强度：毛玻璃主题会设为 1，给折射提供可弯曲的高频内容 */
+  --bg-detail: 0;
+  --bg-protect-top: rgb(246 247 249 / 0.1);
+  --bg-protect-bottom: rgb(246 247 249 / 0.82);
+
+  --page-x: 1rem;
+}
+
+:root.dark {
+  color-scheme: dark;
+
+  /* 深色底不做成纯黑：纯黑在手机上对比过硬，长时间看也容易累，
+     而且会让玻璃类材质失去可折射的内容。抬到有明确色相的深蓝灰。 */
+  --bg-base: #12151f;
+  --bg-elevated: #1a1e2a;
+
+  --surface: rgb(38 44 58 / 0.66);
+  --surface-strong: rgb(40 47 62 / 0.9);
+  --surface-soft: rgb(38 44 58 / 0.42);
+  --surface-hover: rgb(50 57 74 / 0.86);
+  --surface-sunken: rgb(255 255 255 / 0.07);
+
+  --text: #f2f5fa;
+  /* 同上：深色下三级文字原来只有 0.44，实测对比度约 3:1，偏淡 */
+  --text-secondary: rgb(238 243 250 / 0.78);
+  --text-tertiary: rgb(238 243 250 / 0.66);
+  --text-invert: #12151f;
+
+  --line: rgb(255 255 255 / 0.11);
+  --line-strong: rgb(255 255 255 / 0.18);
+  --scrim: rgb(0 0 0 / 0.62);
+
+  --accent: var(--color-accent-400);
+  --accent-strong: var(--color-accent-500);
+  --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
+  --accent-ring: color-mix(in srgb, var(--accent) 42%, transparent);
+  /* 深色主题下 accent 本身就是浅色（accent-400），压在深色浅底上实测约 5.4:1，
+     已经达标，所以直接沿用 --accent，不做压暗。 */
+  /* 深色主题下 accent 本身是浅色，压暗会更看不清，要往白里提一档。
+     实测 liquid-glass 的选中态在 3.66:1、immersive 4.49:1，都不达标。 */
+  --accent-on-soft: color-mix(in srgb, var(--accent) 68%, #fff);
+  /* 深色主题下 accent 是浅色（accent-400），白字压它只有约 2.1:1，
+     改用深色文字反而能到约 9:1。底色沿用 accent，只是把文字反过来。 */
+  --primary-bg: var(--accent);
+  --primary-bg-hover: var(--accent-strong);
+  --on-accent: var(--text-invert);
+  /* 深色主题的 --bad 是浅红（#f98585），白字只有 2.41:1，
+     与主按钮同理改用深字，实测约 7.8:1。 */
+  --danger-bg: var(--bad);
+  --danger-bg-hover: color-mix(in srgb, var(--bad) 86%, #fff);
+  --on-danger: var(--text-invert);
+  /* 深色主题的热力梯度。上限比浅色主题低得多：深色下 accent 本身是浅色，
+     填充比例一高，底色就变亮，浅色文字立刻压不住（90% 时实测只有 1.84:1）。 */
+  --heat-0: var(--surface-sunken);
+  --heat-1: color-mix(in srgb, var(--accent) 8%, transparent);
+  --heat-2: color-mix(in srgb, var(--accent) 16%, transparent);
+  --heat-3: color-mix(in srgb, var(--accent) 25%, transparent);
+  --heat-4: color-mix(in srgb, var(--accent) 34%, transparent);
+
+  --ok: #4dd6a0;
+  --ok-soft: color-mix(in srgb, #34c98a 18%, transparent);
+  --warn: #f5b95e;
+  --warn-soft: color-mix(in srgb, #f2a83b 18%, transparent);
+  --bad: #f98585;
+  --bad-soft: color-mix(in srgb, #ef6b6b 18%, transparent);
+  --info: #6cb2f0;
+  --info-soft: color-mix(in srgb, #6cb2f0 18%, transparent);
+
+  /* 深色下状态色本身就是浅色，压在深底上够用，直接 alias（见 :root 的说明） */
+  --ok-text: var(--ok);
+  --warn-text: var(--warn);
+  --bad-text: var(--bad);
+  --info-text: var(--info);
+  --accent-text: var(--accent-on-soft);
+  --on-ok: var(--text-invert);
+
+  --glass-blur: 26px;
+  --glass-sat: 135%;
+  --refract-line: rgb(255 255 255 / 0.45);
+
+  /* 深色模式下玻璃更暗一些，避免整片发灰 */
+  --lg-op: 0.2;
+  --lg-blur-px: 16px;
+  --lg-sat: 130%;
+  --lg-tint-rgb: 255 255 255;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 16px -6px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 0.32), 0 16px 36px -12px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 6px 12px rgb(0 0 0 / 0.36), 0 32px 64px -16px rgb(0 0 0 / 0.7);
+
+  --bg-veil: 0.32;
+  --bg-veil-color: 10 13 20;
+  --bg-tint: transparent;
+  --bg-protect-top: rgb(18 21 31 / 0.12);
+  --bg-protect-bottom: rgb(18 21 31 / 0.78);
+}
+
+/* ---------- 3. 主题变体 ---------- */
+
+/* 极简白：纯净，零色偏，浮起靠层次而非边框 */
+:root { --adaptive-ink-dark: #101828; --adaptive-ink-light: #f8fafc; }
+:root[data-theme='pure-light'] {
+  --bg-base: #ffffff;
+  --surface: rgb(255 255 255 / 0.86);
+  --surface-sunken: rgb(15 23 42 / 0.035);
+  --text: #0b1220;
+  --text-secondary: #344054;
+  --text-tertiary: #475467;
+  --line: rgb(16 24 40 / 0.07);
+  --accent: #3f7df6;
+  --accent-strong: #2f6ae0;
+  --glass-blur: 20px;
+  --bg-tint: transparent; /* 极简白：纯净，不加任何色偏 */
+  --bg-protect-bottom: rgb(255 255 255 / 0.88);
+}
+:root.dark[data-theme='pure-light'] {
+  --bg-base: #0b0d12;
+  --surface: rgb(26 30 40 / .94);
+  --surface-strong: rgb(32 38 50 / .98);
+  --surface-sunken: rgb(255 255 255 / .07);
+  --text: #f2f5fa;
+  --text-secondary: #d0d7e2;
+  --text-tertiary: #bac4d2;
+  --line: rgb(255 255 255 / .14);
+  --accent: #8fb4ff;
+  --accent-strong: #6f9cff;
+  --bg-protect-bottom: rgb(11 13 18 / .88);
+}
+
+/* 极简黑：沉浸、安静，减少对比刺眼 */
+:root[data-theme='pure-dark'] {
+  --bg-base: #08090c;
+  --bg-elevated: #0f1116;
+  --surface: rgb(24 27 34 / 0.62);
+  --surface-strong: rgb(26 30 38 / 0.88);
+  --surface-sunken: rgb(255 255 255 / 0.045);
+  --text: #eef1f6;
+  --text-secondary: rgb(238 241 246 / 0.78);
+  --line: rgb(255 255 255 / 0.08);
+  --accent: #8fb4ff;
+  --accent-strong: #6f9cff;
+  --glass-blur: 28px;
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 0.4), 0 18px 40px -14px rgb(0 0 0 / 0.75);
+  --bg-tint: radial-gradient(120% 80% at 50% 0%, rgb(80 110 190 / 0.1), transparent 62%);
+  --bg-protect-bottom: rgb(8 9 12 / 0.88);
+}
+
+/* 柔和浅色：米白 / 浅蓝 / 淡紫，最舒适的学习底色 */
+:root[data-theme='soft'] {
+  --bg-base: #f7f4ef;
+  --surface: rgb(255 253 250 / 0.8);
+  --surface-strong: rgb(255 253 250 / 0.93);
+  --text: #211d29;
+  --text-secondary: rgb(33 29 41 / 0.74);
+  --line: rgb(40 30 60 / 0.08);
+  --accent: #8b7bd8;
+  --accent-strong: #7566c9;
+  --ok: #3f9e78;
+  --glass-sat: 160%;
+  /* 柔和浅色：米白 + 淡紫的柔和氛围 */
+  --bg-tint: radial-gradient(90% 70% at 50% 100%, rgb(255 232 214 / 0.55), transparent 70%),
+    radial-gradient(80% 60% at 12% 8%, rgb(203 216 255 / 0.5), transparent 72%);
+  --bg-protect-bottom: rgb(247 244 239 / 0.86);
+}
+:root.dark[data-theme='soft'] {
+  --bg-base: #12111a;
+  --surface: rgb(38 35 52 / 0.66);
+  --surface-strong: rgb(40 37 55 / 0.9);
+  --text: #f1eef8;
+  --text-secondary: rgb(241 238 248 / 0.78);
+  --line: rgb(255 255 255 / 0.09);
+  --accent: #a99cf0;
+  --accent-strong: #8d7ee6;
+  --bg-protect-bottom: rgb(18 17 26 / 0.88);
+}
+
+/* 毛玻璃主题：材质由 Card / 容器按主题自动选为 lg-surface，
+   这里只负责这个主题自己的配色、背景性格与光学强度 */
+/* 液态玻璃与毛玻璃共用同一套配色令牌。
+   两者的区别在**材质实现**（WebGL 逐像素折射 vs SVG 位移+模糊），不在配色，
+   所以这里让两个主题选择器共用一份变量，避免维护两份会漂移的颜色。 */
+:root[data-theme='liquid-glass'],
+:root[data-theme='liquid-glass-wc'] {
+  --bg-base: #e9eef7;
+  --surface: rgb(255 255 255 / 0.52);
+  --surface-strong: rgb(255 255 255 / 0.78);
+  --surface-soft: rgb(255 255 255 / 0.4);
+  --surface-sunken: rgb(20 32 60 / 0.06);
+  --text: #0d1424;
+  --text-secondary: rgb(13 20 36 / 0.76);
+  --line: rgb(16 24 40 / 0.1);
+  --accent: #3f7df6;
+  --accent-strong: #2f6ae0;
+  --shadow-md: 0 2px 4px rgb(16 24 40 / 0.05), 0 16px 36px -10px rgb(16 24 40 / 0.18);
+  --glass-blur: 18px;
+  --glass-sat: 155%;
+
+  /* 填充与模糊对照 Apple 图标再收一档：
+     图标后面的蓝色光带是**清晰**的，说明几乎不模糊；
+     填充也远比我之前设的淡。 */
+  --lg-op: 0.2;
+  --lg-blur-px: 1px;
+  --lg-sat: 190%;
+  --lg-border-opacity: 0.3;
+
+  /* 折射需要有细节可弯，所以这个主题的背景自带细颗粒与微网格 */
+  --bg-detail: 1;
+  --bg-tint: radial-gradient(120% 75% at 14% 4%, rgb(88 128 255 / 0.4), transparent 62%),
+    radial-gradient(100% 70% at 88% 18%, rgb(64 210 200 / 0.32), transparent 64%),
+    radial-gradient(130% 90% at 50% 104%, rgb(176 123 255 / 0.34), transparent 68%);
+  --bg-protect-bottom: rgb(233 238 247 / 0.72);
+}
+
+:root.dark[data-theme='liquid-glass'],
+:root.dark[data-theme='liquid-glass-wc'] {
+  /* 深色底不能压到接近纯黑：毛玻璃的作用是模糊并折射背景，
+     背景若是纯黑，折射出来还是黑，整块玻璃就变成一块黑板 ——
+     实测原来的 #070a14 背景中心亮度只有 26/255，玻璃完全显不出质感。
+     这里抬到有明确色彩与明度的深蓝紫，让玻璃有东西可折射。 */
+  --bg-base: #151b30;
+  --surface: rgb(56 68 100 / 0.5);
+  --surface-strong: rgb(48 58 88 / 0.82);
+  --surface-soft: rgb(18 25 44 / 0.24);
+  --surface-sunken: rgb(255 255 255 / 0.08);
+  --text: #f2f5fb;
+  --text-secondary: rgb(242 245 251 / 0.74);
+  --line: rgb(255 255 255 / 0.14);
+  --accent: #8ab4ff;
+  --accent-strong: #6f9cff;
+  --lg-op: 0.14;
+  --lg-blur-px: 1px;
+  --lg-sat: 170%;
+  --bg-detail: 1;
+  /* 遮罩调薄，主题色偏加强，让背景保留可辨识的色彩层次 */
+  --bg-veil: 0.22;
+  --bg-tint: radial-gradient(120% 75% at 18% 6%, rgb(88 128 255 / 0.6), transparent 64%),
+    radial-gradient(100% 70% at 86% 22%, rgb(46 190 190 / 0.46), transparent 66%),
+    radial-gradient(130% 90% at 50% 104%, rgb(146 104 255 / 0.54), transparent 70%);
+  --bg-protect-bottom: rgb(21 27 48 / 0.7);
+}
+
+/* 沉浸式：背景主导视觉，玻璃最强，文字保护层最厚 */
+:root[data-theme='immersive'] {
+  --bg-base: #eef1f6;
+  --surface: rgb(255 255 255 / 0.66);
+  --surface-strong: rgb(255 255 255 / 0.86);
+  --glass-blur: 30px;
+  --glass-sat: 170%;
+  --bg-veil: 0.3;
+  /* 沉浸式：背景就是主视觉，色偏最强 */
+  --bg-tint: radial-gradient(100% 70% at 50% 6%, rgb(56 106 200 / 0.34), transparent 66%),
+    radial-gradient(90% 60% at 88% 92%, rgb(140 92 220 / 0.28), transparent 70%);
+  --bg-protect-bottom: rgb(240 243 248 / 0.66);
+}
+:root.dark[data-theme='immersive'] {
+  --bg-base: #070910;
+  --surface: rgb(22 26 36 / 0.55);
+  --surface-strong: rgb(24 28 40 / 0.8);
+  --glass-blur: 34px;
+  --bg-veil: 0.46;
+  --bg-protect-bottom: rgb(7 9 16 / 0.72);
+}
+
+/* 背景层：由 canvas 绘制（玻璃着色器的纹理源），固定铺满视口。
+   层级最低，不参与交互。 */
+.bg-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 背景层：用户上传图片时，JS 已把图片画进画布，这里不再需要额外层 */
+.bg-layer-fallback {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--bg-base);
+}
+
+/* ==========================================================================
+   liquid-glass-react 的排版补齐（适配层 .lg2 作用域内）
+   ──────────────────────────────────────────────────────────────────────────
+   该包不含任何 CSS 文件，`.glass` / `.glass__warp` 这些类名完全依赖调用方提供样式。
+   缺了这段，内层 inline-flex 不会撑开，实测玻璃尺寸为 0×0、完全不可见。
+   类名限定在 .lg2 下，避免污染全局的 .glass。
+   ========================================================================== */
+.lg2 .glass {
+  width: 100%;
+  height: auto;
+  /*
+   * 去掉库给 .glass 本体的黑色投影
+   * ──────────────────────────────────────────────────────────────
+   * 库的 .glass 上写着它**演示页**用的外阴影：
+   *   box-shadow: rgba(0, 0, 0, 0.25) 0 12px 40px
+   * 40px 的模糊会向四周扩散，在**浅色背景**上形成一圈明显的灰黑边 ——
+   * 这正是用户反复报的「毛玻璃有黑边」。
+   *
+   * 为什么长期没被发现：**在深色背景上完全看不出来**。应用默认是深蓝极光
+   * 背景，之前若干轮都在深色下测试，所以一直漏掉；一切到浅色就现形。
+   *
+   * 上一轮只处理了 .lg2 > span 上那条同类阴影（见下方），漏了这一条 ——
+   * 两者是库在不同层上各画的一条，都要清掉。
+   * 需要阴影的地方由主题自己给（卡片边界由 --line 描边）。
+   *
+   * 必须 !important：这条阴影是库用**内联 style** 写在 .glass 上的，
+   * 内联样式优先于样式表规则 —— 不加 !important 这一条根本不生效
+   * （第一版就是栽在这，改完画面毫无变化）。
+   */
+  box-shadow: none !important;
+}
+
+/* 内容层：库把 children 直接放在 .glass 里，这里补上内边距与层级。
+   注意 children 必须是**在流内**的元素，否则 .glass 量不到高度。 */
+.lg2 .glass > *:last-child {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+
+/* 刃光层与玻璃本体同尺寸，圆角跟随 */
+.lg2 .glass__warp {
+  border-radius: inherit;
+}
+
+/* 中和库对内容的强制排版。
+   库在 children 外面套了一层
+   `div.transition-all.duration-150.ease-in-out.text-white`，
+   并内联写死 `font: 500 20px/1 system-ui` 与一层黑色文字阴影。
+   后果：在浅色主题下会变成「白字压浅玻璃」，完全看不清。
+   这里把颜色与字体还原为继承，让内容继续使用我们的设计令牌。 */
+.lg2 .glass > div:last-child {
+  color: inherit;
+  font: inherit;
+  text-shadow: none;
+}
+
+/* 边缘装饰层：去掉库自带的那条黑色外阴影
+   ──────────────────────────────────────────────────────────────
+   库在 .glass 的两个兄弟 span 上写了一条外阴影
+     rgba(0, 0, 0, 0.35) 0 1px 4px
+   并给它们加了 mix-blend-mode: screen / overlay。
+   这条阴影沿卡片四周绘制，混合后在**圆角处叠成一团团模糊暗斑** ——
+   就是用户报的「毛玻璃四周有黑点」。
+
+   实测排除过其他可能：把 feDisplacementMap 的 scale 设为 0 无变化；
+   隐藏 .glass__warp 无变化；隐藏那两个 bg-black 图层也无变化；
+   只有隐藏这一类装饰层才会让暗斑消失 —— 因此确定是它。
+
+   这里只保留两道白色的内侧高光（那才是玻璃该有的受光边），
+   把黑色外阴影整条去掉。 */
+.lg2 > span {
+  box-shadow:
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.5),
+    inset 0 1px 3px rgb(255 255 255 / 0.25) !important;
+}
+
+/* 参数面板里的实时预览背景：高对比图案，便于看清折射与磨砂 */
+.preview-stage {
+  background:
+    linear-gradient(to right, rgb(255 255 255 / 0.32) 1px, transparent 1px) 0 0 / 18px 18px,
+    linear-gradient(to bottom, rgb(255 255 255 / 0.32) 1px, transparent 1px) 0 0 / 18px 18px,
+    radial-gradient(60% 70% at 18% 20%, #4b7bff 0%, transparent 62%),
+    radial-gradient(50% 60% at 86% 30%, #22c8c0 0%, transparent 62%),
+    radial-gradient(70% 70% at 50% 110%, #9d5cf0 0%, transparent 68%),
+    linear-gradient(158deg, #101833, #141d3d 52%, #0b1124);
+  padding: 10px;
+}
+/* 注意：.preview-stage 目前**没有使用者** —— 它原先只服务于毛玻璃参数面板里的
+   实时预览，而那个面板已按用户要求整块移除（见 GlassSection.tsx）。
+   这里刻意保留样式本身：面板若将来以别的方式回来可以直接复用，
+   且它不产生任何运行时开销（没有元素匹配就不会应用）。 */
+
+/* ---------- 4. 基础 ---------- */
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--bg-base);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior-y: none;
+    transition: background-color 0.35s var(--ease-soft), color 0.35s var(--ease-soft);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1rem); /* 防止 Android/iOS 聚焦时自动放大 */
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  p {
+    margin: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+
+  ::selection {
+    background: var(--accent-ring);
+  }
+
+  /* 数字：等宽，跳秒时不抖动 */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'cv01' 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ---------- 5. 组件级工具类 ---------- */
+@layer utilities {
+  /* ==========================================================================
+     材质分层（三层，安卓性能优先）
+     ──────────────────────────────────────────────────────────────────────────
+       solid        —— 无模糊的实底容器，最省电
+       mica         —— 云母材质：模糊 + 饱和 + 内侧高光，无折射。普通卡片的默认
+       lg-surface   —— 毛玻璃：在 mica 基础上增加 SVG 光学位移折射、
+                       环境色透入与真实边缘高光。只给关键容器用
+
+     毛玻璃实现基于 @dpawlikowski/liquid-glass：
+       它用 SVG feTurbulence + feDisplacementMap 做真实的光学位移，
+       并且在支持 `backdrop-filter: url(#filter)` 的 Chromium 上
+       把滤镜交给合成器处理 —— 主线程零 JS 开销，安卓上可持续运行。
+
+     我在此处只做「调校」，因为库的默认值不适合本项目：
+       1. 默认 --lg-opacity: 0.58 太奶白，会让背景色透不进来 → 降到 0.2~0.3
+       2. 默认边缘是红/青彩色条纹（--lg-edge-red / --lg-edge-cyan）
+          → 改成正白光，避免廉价彩虹感
+       3. 默认 feDisplacementMap scale: 21 偏强，接近果冻感
+          → 降到 11（由 JS 注入滤镜时设置），保持克制的光学变化
+     ========================================================================== */
+
+  /* ==========================================================================
+     毛玻璃的两种渲染路径
+     ──────────────────────────────────────────────────────────────────────────
+     路径 A（WebGL，首选）：着色器直接采样背景纹理并按法线偏移，
+       因此**必须关闭 backdrop-filter** —— 它的模糊正是「磨砂感」的来源。
+       此时容器自身完全透明，一切光学效果由 canvas 提供。
+     路径 B（CSS 降级）：WebGL 不可用 / 省电档 / 用户关掉模糊时，
+       退回 backdrop-filter 的普通模糊（mica 观感），保证不会白屏或透明失效。
+     ========================================================================== */
+
+  /* 路径 A：WebGL 渲染时，容器自身不画任何东西 */
+  .lg-surface--webgl {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  /* WebGL 画布铺满容器，圆角由容器裁切 */
+  .lg-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  /* 装饰层（画布 / 刃光 / 内部光带）必须位于内容**之下**。
+     做法是给它们负的 z-index，并让容器建立独立层叠上下文
+     （.lg-surface 已设 isolation: isolate），
+     这样既不用给 children 套包裹 div，也不会破坏容器的布局语义。 */
+  .lg-surface > .lg-canvas,
+  .lg-surface > .lg-bevel,
+  .lg-surface > .lg-sheen {
+    z-index: -1;
+  }
+
+  /* 路径 B：仅在 CSS 降级时使用模糊 */
+  .lg-surface:not(.lg-surface--webgl) {
+    -webkit-backdrop-filter: blur(var(--lg-blur-px)) saturate(var(--lg-sat)) brightness(1.06);
+    backdrop-filter: blur(var(--lg-blur-px)) saturate(var(--lg-sat)) brightness(1.06);
+  }
+
+  /* 一级：真毛玻璃。用于底部导航、主计时卡、度量卡、弹层等关键容器。
+     ──────────────────────────────────────────────────────────────
+     实测结论（对比过磨砂玻璃与多种参数）：
+     毛玻璃**不是模糊更强**，而是「几乎不模糊 + 光学位移 + 边缘聚光」。
+       模糊 18px 时背景网格完全糊掉 —— 那是磨砂玻璃
+       模糊 1.5px 时网格清晰可见但被拉伸弯曲 —— 这才是毛玻璃
+     所以降级路径的 blur 也只有 1.5px，tint 压得很低，让环境色透进来。 */
+  .lg-surface {
+    /* 容器自身建立独立层叠上下文，装饰层才能用负 z-index 落在内容之下。
+       这两条原先是靠库的 .liquid-glass 提供的，现在不再使用该 class，
+       必须自己声明 —— 否则负 z-index 的兄弟层会穿到父级背景之下而消失。 */
+    position: relative;
+    isolation: isolate;
+    /* 让画布与刃光严格被圆角裁切 */
+    overflow: hidden;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
+
+    --lg-tint: var(--lg-tint-rgb);
+    --lg-opacity: var(--lg-op);
+    --lg-blur: var(--lg-blur-px);
+    --lg-saturate: var(--lg-sat);
+    --lg-radius: 1.25rem;
+    --lg-border-opacity: 0.34;
+    --lg-shadow: var(--shadow-md);
+    /* 中性边缘高光：只用白光，没有红青彩边（色散交给滤镜在边缘产生） */
+    --lg-edge-red: rgb(255 255 255 / 0.42);
+    --lg-edge-cyan: rgb(255 255 255 / 0.26);
+    --lg-scene-background: var(--bg-scene-image, none);
+
+    /* 兜底：普通模糊。@supports 成立时会被替换成带透镜位移的版本。
+       必须成对写 -webkit- 前缀，否则 Safari 会拿到无效值。 */
+    -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate)) brightness(1.06);
+    backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate)) brightness(1.06);
+  }
+
+  /* 关键：只有引擎真的支持 backdrop-filter 引用 SVG 滤镜时才启用透镜位移。
+     这条 @supports 不只是加效果 —— 它同时保证了不支持时
+     backdrop-filter 仍是一条有效的模糊声明，而不是整条属性被丢弃导致玻璃变透明。 */
+  @supports (backdrop-filter: url('#liquid-glass-filter')) or (-webkit-backdrop-filter: url('#liquid-glass-filter')) {
+    .lg-surface {
+      -webkit-backdrop-filter: blur(var(--lg-blur)) var(--lg-filter) saturate(var(--lg-saturate))
+        brightness(1.06) contrast(1.04);
+      backdrop-filter: blur(var(--lg-blur)) var(--lg-filter) saturate(var(--lg-saturate))
+        brightness(1.06) contrast(1.04);
+    }
+  }
+
+  /* 边缘光晕：取消掉。
+     之前用径向遮罩在边缘堆了一圈白，这正是「边缘白得生硬」的直接来源。
+     玻璃边缘的亮度应该由 lg-bevel 的镜面反射带来，而不是靠一圈白色渐变。 */
+  .lg-surface::before {
+    background: rgb(var(--lg-tint) / var(--lg-opacity));
+  }
+
+  /* 二级：mica（云母）材质。用于普通卡片与列表项。
+     只有模糊与高光，没有光学位移折射，合成成本极低。
+     命名沿用 Windows 11 的材质术语：Mica 是把桌面壁纸色调带入窗口的底材，
+     与「真折射」的 Liquid Glass 是两种不同层级的东西，不该混为一谈。 */
+  .mica {
+    position: relative;
+    isolation: isolate;
+    background: var(--surface);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .mica::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(
+      160deg,
+      rgb(255 255 255 / 0.4) 0%,
+      rgb(255 255 255 / 0.05) 36%,
+      rgb(255 255 255 / 0) 64%
+    );
+    opacity: calc(0.7 * var(--glass-alpha));
+    z-index: -1;
+  }
+
+  :root.dark .mica::before {
+    background: linear-gradient(
+      160deg,
+      rgb(255 255 255 / 0.12) 0%,
+      rgb(255 255 255 / 0.03) 38%,
+      rgb(255 255 255 / 0) 66%
+    );
+  }
+
+  /* 内部光结构：内部要**比边缘暗**才有纵深。
+     参考图标的内部是暗的透明玻璃，亮度几乎全在刃边上。
+     所以这里只留极淡的下沿回光，并把上沿轻微压暗以衬托刃光。 */
+  .lg-sheen {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 3;
+    background:
+      linear-gradient(180deg, rgb(12 20 40 / 0.06) 0%, transparent 8%),
+      radial-gradient(
+        130% 55% at 50% 114%,
+        rgb(255 255 255 / 0.14) 0%,
+        rgb(255 255 255 / 0.04) 38%,
+        transparent 66%
+      );
+  }
+
+  :root.dark .lg-sheen {
+    background:
+      linear-gradient(180deg, rgb(0 0 0 / 0.22) 0%, transparent 9%),
+      radial-gradient(
+        130% 55% at 50% 114%,
+        rgb(255 255 255 / 0.09) 0%,
+        rgb(255 255 255 / 0.03) 40%,
+        transparent 68%
+      );
+  }
+
+  /* 性能档位：关闭模糊 —— 一级玻璃退化为高不透明度实底，文字依然清晰 */
+  :root[data-blur='off'] .lg-surface,
+  :root[data-blur='off'] .mica {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--surface-strong);
+    --glass-alpha: 0;
+  }
+
+  :root[data-blur='off'] .lg-surface::before {
+    opacity: 0.72;
+    background: var(--surface-strong);
+  }
+
+  /* 省电档位：一级玻璃降级为普通模糊（不做折射），避免连续滤镜开销 */
+  :root[data-perf='saver'] .lg-surface,
+  :root[data-perf='low'] .lg-surface {
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+    box-shadow: var(--shadow-xs);
+  }
+
+  :root[data-perf='saver'] .lg-surface::after,
+  :root[data-perf='low'] .lg-surface::after {
+    box-shadow: none;
+    mix-blend-mode: normal;
+  }
+
+  /* ==========================================================================
+     毛玻璃的边缘结构 —— 这是整个材质辨识度的核心
+     ──────────────────────────────────────────────────────────────────────────
+     逐帧对照 Apple 官方 Liquid Glass 演示（搜索栏压在彩虹照片上）后确认：
+       1. 玻璃后的内容**几乎不被模糊**，彩虹条纹、树叶纹理都保持锐利
+          → 所以 blur 只有 1~2px，模糊不是玻璃感的来源
+       2. 真正让形状「立起来」的是**边缘的一圈厚斜面**：
+          多层同心亮环 + 一道柔和的白色起棱，圆角完整，约 2~4px 厚
+          → 这是「玻璃厚度」的视觉表达，也是最容易被忽略的一点
+       3. 填充并不是越透越好：App Store 的通知条其实相当白
+          → 靠边缘结构 + 适度填充共同作用，而不是一味降低不透明度
+     ========================================================================== */
+
+  /* 边缘主结构：外圈细描边 + 顶部起棱 + 底部反光 + 内圈亮环。
+     用 spread（第 4 个值）而不是模糊半径来营造「厚度」，
+     这样边缘是清晰的斜面而不是发光的晕。 */
+  .lg-surface::after {
+    z-index: 4;
+    border-radius: inherit;
+    box-shadow:
+      /* 外轮廓：极细的冷白描边，把玻璃从背景里切出来 */
+      inset 0 0 0 0.5px rgb(255 255 255 / 0.5),
+      /* 顶部起棱：最亮的一道，模拟光源从上方打在玻璃上沿 */
+      inset 0 1.5px 0 rgb(255 255 255 / 0.82),
+      /* 底部反光：下方环境光的回弹 */
+      inset 0 -1.5px 0 rgb(255 255 255 / 0.34),
+      /* 内圈亮环：制造「有一层厚度」的观感，是毛玻璃的关键 */
+      inset 0 0 0 2.5px rgb(255 255 255 / 0.16),
+      /* 极淡的内阴影，避免玻璃内部与边缘一样亮而显得扁平 */
+      inset 0 -18px 30px -20px rgb(255 255 255 / 0.3);
+    mix-blend-mode: plus-lighter;
+  }
+
+  :root.dark .lg-surface::after {
+    box-shadow:
+      inset 0 0 0 0.5px rgb(255 255 255 / 0.3),
+      inset 0 1.5px 0 rgb(255 255 255 / 0.55),
+      inset 0 -1.5px 0 rgb(255 255 255 / 0.2),
+      inset 0 0 0 2.5px rgb(255 255 255 / 0.1),
+      inset 0 -18px 30px -20px rgb(255 255 255 / 0.18);
+  }
+
+  /* 边缘折射环：这是「毛玻璃」与「磨砂玻璃」观感上最大的区别。
+     真实玻璃在靠近边缘处厚度急剧变化，折射率最高，所以背景的细节
+     会在边缘附近被明显拉伸、弯曲并聚光。
+     这里用一层遮罩只保留边缘 22px，让边缘比中心更亮、更「厚」，
+     模拟这种边缘聚光。纯静态渐变 + mask，合成器可一次性处理。 */
+  .lg-surface::before {
+    background:
+      radial-gradient(
+        120% 120% at 50% 50%,
+        transparent 58%,
+        rgb(var(--lg-tint) / 0.12) 78%,
+        rgb(var(--lg-tint) / 0.3) 92%,
+        rgb(var(--lg-tint) / 0.42) 100%
+      ),
+      rgb(var(--lg-tint) / var(--lg-opacity));
+  }
+
+  /* 边缘内侧的细微暗环：让玻璃与背景之间有「厚度」而不是贴纸感 */
+  .lg-surface .lg-rim {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 2;
+    padding: 1px;
+    background: linear-gradient(
+      160deg,
+      rgb(255 255 255 / 0.5) 0%,
+      rgb(255 255 255 / 0.08) 30%,
+      transparent 50%,
+      rgb(255 255 255 / 0.12) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+
+  :root.dark .lg-surface .lg-rim {
+    background: linear-gradient(
+      160deg,
+      rgb(255 255 255 / 0.32) 0%,
+      rgb(255 255 255 / 0.05) 32%,
+      transparent 52%,
+      rgb(255 255 255 / 0.08) 100%
+    );
+  }
+
+  /* WebGL 路径下由着色器负责染色，容器不再叠白 */
+  .lg-surface--webgl::before {
+    background: transparent;
+  }
+
+  /* 边缘刃光（bevel）
+     ──────────────────────────────────────────────────────────────
+     与参考图并排对照后的关键发现（这一步纠正了最根本的错误）：
+
+     参考图标里**内部是暗的透明玻璃**，亮度几乎全部集中在**上沿一条极细的
+     白色刃边**上；而我之前一直在给内部加白，所以内部亮、边缘还要再叠白，
+     结果两头都不像。
+
+     正确的结构是：
+        内部：接近纯透明，只带极轻的色调，比边缘略暗 —— 这是纵深感的来源
+        上沿：一条**极细且锐利**的白刃（镜面反射），约 1px，不模糊
+        左右：刃光迅速衰减到几乎不可见
+        下沿：几乎无光，甚至略暗（光线在斜面下侧被偏折开）
+        最外沿：0.5px 冷暗描边，把玻璃从背景里切出来
+
+     所以刃光用「细窄 + 锐利 + 方向性极强」，而不是一圈均匀的亮边。 */
+  .lg-bevel {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 4;
+    padding: 1px; /* 越薄越像刃口；厚了就变成描边 */
+    background:
+      conic-gradient(
+        from 180deg at 50% 50%,
+        /* 底部与两侧：几乎完全透明 */
+        transparent 0deg,
+        transparent 40deg,
+        rgb(255 255 255 / 0.07) 72deg,
+        rgb(255 255 255 / 0.45) 105deg,
+        /* 左上与右上：刃光最锐的两段 */
+        rgb(255 255 255 / 0.9) 140deg,
+        rgb(255 255 255 / 1) 180deg,
+        rgb(255 255 255 / 0.9) 220deg,
+        rgb(255 255 255 / 0.45) 255deg,
+        rgb(255 255 255 / 0.07) 288deg,
+        transparent 320deg,
+        transparent 360deg
+      );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    mix-blend-mode: plus-lighter;
+  }
+
+  /* 玻璃侧壁与纵深。
+     立体感来自「内部比边缘暗」这个交替，而不是来自加白：
+       外沿一道极细冷暗线 → 刃光是亮的 → 内部垫一层很淡的暗 →
+       内部再比边缘亮一点点才显得通透
+     注意：这一段只作用于 .lg-surface 路径（引导页、提示条、实验台），
+     首页卡片走的是库的 .lg2/.glass，不受这里影响。 */
+  .lg-bevel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow:
+      inset 0 0 0 0.5px rgb(12 20 40 / 0.22),
+      inset 0 0 0 1px rgb(255 255 255 / 0.05),
+      inset 0 -1px 1px rgb(12 20 40 / 0.16),
+      inset 0 0 6px 1px rgb(12 20 40 / 0.06);
+  }
+
+  :root.dark .lg-bevel {
+    background:
+      conic-gradient(
+        from 180deg at 50% 50%,
+        transparent 0deg,
+        transparent 40deg,
+        rgb(255 255 255 / 0.05) 72deg,
+        rgb(255 255 255 / 0.3) 105deg,
+        rgb(255 255 255 / 0.62) 140deg,
+        rgb(255 255 255 / 0.72) 180deg,
+        rgb(255 255 255 / 0.62) 220deg,
+        rgb(255 255 255 / 0.3) 255deg,
+        rgb(255 255 255 / 0.05) 288deg,
+        transparent 320deg,
+        transparent 360deg
+      );
+  }
+
+  :root.dark .lg-bevel::after {
+    box-shadow:
+      inset 0 0 0 0.5px rgb(255 255 255 / 0.14),
+      inset 0 0 0 1px rgb(0 0 0 / 0.18),
+      inset 0 -1px 1px rgb(0 0 0 / 0.3),
+      inset 0 0 6px 1px rgb(0 0 0 / 0.12);
+  }
+
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top), 0.5rem);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+  .min-h-dvh-safe {
+    min-height: 100dvh;
+  }
+
+  .page-x {
+    padding-left: max(var(--page-x), env(safe-area-inset-left));
+    padding-right: max(var(--page-x), env(safe-area-inset-right));
+  }
+
+  /* 手机/iPad 上的横滑列表 */
+  .scroll-x {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+  .snap-item {
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .text-secondary {
+    color: var(--text-secondary);
+  }
+  .text-tertiary {
+    color: var(--text-tertiary);
+  }
+  .text-accent {
+    color: var(--accent);
+  }
+
+  /* 大数字（倒计时 / 时间）的视觉层级 */
+  .num-hero {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 0.92;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ---------- 6. 动画（克制） ---------- */
+@layer utilities {
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 10px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes pop {
+    0% {
+      transform: scale(0.94);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.015);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes sheen {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  .anim-rise {
+    animation: rise 0.44s var(--ease-soft) both;
+  }
+  .anim-fade {
+    animation: fade 0.3s var(--ease-soft) both;
+  }
+  .anim-pop {
+    animation: pop 0.36s var(--ease-soft) both;
+  }
+
+  /* ---------- 火花复燃（断签接回成功）----------
+     克制版：火焰从一点余烬长起来 + 一圈很淡的光晕 + 十几颗火星向上散，
+     不用 WebGL / 不画满屏粒子；颜色全部来自语义令牌。
+     时长 ~1.6s，之后由组件卸载自己消失。 */
+  @keyframes spark-ignite {
+    0% {
+      opacity: 0;
+      transform: scale(0.35);
+    }
+    45% {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+    70% {
+      transform: scale(0.98);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes spark-glow {
+    0% {
+      opacity: 0;
+      transform: scale(0.55);
+    }
+    40% {
+      opacity: 0.9;
+      transform: scale(1.06);
+    }
+    100% {
+      opacity: 0.5;
+      transform: scale(1.18);
+    }
+  }
+  @keyframes spark-ember {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 8px, 0) scale(0.6);
+    }
+    18% {
+      opacity: 0.95;
+    }
+    100% {
+      opacity: 0;
+      transform: translate3d(var(--dx), calc(-1 * var(--dy)), 0) scale(0.35);
+    }
+  }
+  @keyframes spark-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .spark-ignite {
+    animation: spark-ignite 0.9s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  }
+  .spark-glow {
+    animation: spark-glow 1.6s ease-out both;
+  }
+  .spark-ember {
+    animation: spark-ember 1.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  }
+  .spark-fade-in {
+    animation: spark-fade-in 0.5s var(--ease-soft) both;
+  }
+
+  :root[data-motion='off'] .spark-ignite,
+  :root[data-motion='off'] .spark-glow,
+  :root[data-motion='off'] .spark-ember,
+  :root[data-motion='off'] .spark-fade-in {
+    animation: none;
+  }
+
+  :root[data-motion='off'] .anim-rise,
+  :root[data-motion='off'] .anim-fade,
+  :root[data-motion='off'] .anim-pop {
+    animation: none;
+  }
+}
+
+/* ---------- 7. 程序化动态背景（零图片，省电） ---------- */
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: var(--bg-base);
+  transition: background-color 0.5s var(--ease-soft);
+}
+
+/* 背景归一化遮罩：任何背景、任何亮度，都能保证文字可读 */
+.bg-veil {
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--bg-veil-color) / var(--bg-veil));
+  transition: background 0.5s var(--ease-soft);
+}
+
+/* 内容区渐变保护层 */
+.bg-protect {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--bg-protect-top) 0%,
+    transparent 22%,
+    transparent 58%,
+    var(--bg-protect-bottom) 100%
+  );
+}
+
+/* 主题色偏层：叠在背景之上、遮罩之下，决定这套主题的气质 */
+.bg-tint {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-tint);
+  transition: background 0.5s var(--ease-soft);
+}
+
+/* 背景细节层：细颗粒 + 微网格。
+   存在的意义是「给折射提供可弯曲的内容」——
+   在纯平滑渐变上，位移折射在数学上有效果、视觉上却看不出来。
+   这一层让玻璃边缘的拉伸与弯曲变得可见，从而真正读起来像毛玻璃。
+   成本：几个静态背景图，零 JS、零动画。
+   强度由 --bg-detail 控制（毛玻璃主题最强）。 */
+.bg-detail {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--bg-detail);
+  transition: opacity 0.5s var(--ease-soft);
+  background-image:
+    radial-gradient(1.2px 1.2px at 18px 22px, rgb(20 32 60 / 0.5), transparent 100%),
+    radial-gradient(1.4px 1.4px at 96px 74px, rgb(20 32 60 / 0.4), transparent 100%),
+    radial-gradient(1.1px 1.1px at 148px 34px, rgb(20 32 60 / 0.45), transparent 100%),
+    radial-gradient(1.3px 1.3px at 58px 128px, rgb(20 32 60 / 0.36), transparent 100%),
+    linear-gradient(to right, rgb(20 32 60 / 0.28) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(20 32 60 / 0.28) 1px, transparent 1px);
+  background-size:
+    180px 180px,
+    180px 180px,
+    180px 180px,
+    180px 180px,
+    30px 30px,
+    30px 30px;
+}
+
+:root.dark .bg-detail {
+  background-image:
+    radial-gradient(1.2px 1.2px at 18px 22px, rgb(255 255 255 / 0.5), transparent 100%),
+    radial-gradient(1.4px 1.4px at 96px 74px, rgb(255 255 255 / 0.38), transparent 100%),
+    radial-gradient(1.1px 1.1px at 148px 34px, rgb(255 255 255 / 0.45), transparent 100%),
+    radial-gradient(1.3px 1.3px at 58px 128px, rgb(255 255 255 / 0.34), transparent 100%),
+    linear-gradient(to right, rgb(255 255 255 / 0.22) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.22) 1px, transparent 1px);
+}
+
+.bg-scene {
+  position: absolute;
+  inset: -10%;
+  will-change: transform, opacity;
+}
+
+.scene-dawn {
+  background:
+    radial-gradient(120% 80% at 8% 4%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 60%),
+    radial-gradient(100% 70% at 92% 12%, color-mix(in srgb, var(--color-warn-500) 22%, transparent), transparent 62%),
+    radial-gradient(120% 90% at 50% 108%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 66%);
+}
+
+.scene-aurora {
+  background:
+    radial-gradient(70% 55% at 22% 26%, color-mix(in srgb, var(--accent) 40%, transparent), transparent 68%),
+    radial-gradient(60% 50% at 78% 34%, color-mix(in srgb, var(--color-ok-500) 32%, transparent), transparent 66%),
+    radial-gradient(80% 60% at 52% 82%, color-mix(in srgb, #a78bfa 34%, transparent), transparent 70%);
+  filter: blur(28px);
+  animation: aurora-drift 26s var(--ease-soft) infinite alternate;
+}
+
+@keyframes aurora-drift {
+  from {
+    transform: translate3d(-3%, -2%, 0) scale(1.06);
+  }
+  to {
+    transform: translate3d(4%, 3%, 0) scale(1.16);
+  }
+}
+
+.scene-dusk {
+  background: linear-gradient(
+    200deg,
+    color-mix(in srgb, var(--accent) 30%, transparent) 0%,
+    color-mix(in srgb, #f472b6 20%, transparent) 42%,
+    transparent 78%
+  );
+}
+
+.scene-grid {
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(120% 90% at 50% 0%, #000 0%, transparent 78%);
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 0%, transparent 78%);
+  opacity: 0.85;
+}
+
+.scene-stars {
+  background-repeat: repeat;
+  background-size: 320px 320px;
+  background-image:
+    radial-gradient(1.4px 1.4px at 24px 38px, color-mix(in srgb, var(--text) 42%, transparent), transparent),
+    radial-gradient(1.1px 1.1px at 132px 96px, color-mix(in srgb, var(--text) 30%, transparent), transparent),
+    radial-gradient(1.6px 1.6px at 214px 186px, color-mix(in srgb, var(--text) 38%, transparent), transparent),
+    radial-gradient(1px 1px at 62px 244px, color-mix(in srgb, var(--text) 26%, transparent), transparent),
+    radial-gradient(1.3px 1.3px at 276px 58px, color-mix(in srgb, var(--text) 34%, transparent), transparent),
+    radial-gradient(1px 1px at 172px 292px, color-mix(in srgb, var(--text) 24%, transparent), transparent);
+  animation: star-twinkle 9s ease-in-out infinite alternate;
+}
+
+@keyframes star-twinkle {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 0.95;
+  }
+}
+
+.scene-rain {
+  background-image: repeating-linear-gradient(
+    104deg,
+    transparent 0 22px,
+    color-mix(in srgb, var(--text) 9%, transparent) 22px 23px,
+    transparent 23px 46px
+  );
+  animation: rain-fall 0.85s linear infinite;
+}
+
+@keyframes rain-fall {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -60px 420px;
+  }
+}
+
+.scene-glow {
+  background:
+    radial-gradient(60% 44% at 50% -6%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 70%),
+    radial-gradient(70% 50% at 12% 96%, color-mix(in srgb, var(--color-ok-500) 20%, transparent), transparent 72%);
+  animation: glow-breathe 18s ease-in-out infinite alternate;
+}
+
+@keyframes glow-breathe {
+  from {
+    opacity: 0.72;
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* 自定义图片背景（自动处理亮度） */
+.bg-photo {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transform: scale(1.02);
+}
+
+/* 低性能 / 减少动画：一切静态化 */
+:root[data-motion='off'] .bg-scene,
+:root[data-perf='low'] .bg-scene {
+  animation: none !important;
+}
+:root[data-perf='low'] .scene-aurora {
+  filter: blur(18px);
+}
+
+/* ---------- 8. 弹层 / 输入 ---------- */
+.sheet-backdrop {
+  background: rgb(6 8 12 / 0.42);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/*
+ * ⚠️ 输入框样式**必须放在 @layer components 里**，不能写在层之外。
+ *
+ * CSS 层叠规则：**层之外的样式压过所有 @layer 里的规则**。
+ * 这个文件顶上那条「库样式无层级，所以会输给我方 @layer utilities」是**故意**的
+ * （为了压住玻璃库），但同一条规则反过来也成立 —— `.field` 如果留在层外，
+ * 它的 `width: 100%` 就会压掉组件里任何宽度工具类。
+ *
+ * 实测踩过：给分钟输入框加 `w-[4.6rem]` 完全不生效，输入框仍是 370px 满宽，
+ * 还把旁边的滑块挤到只剩 129px（用户报的「手写栏目过长」就是这个）。
+ *
+ * 放进 components 层后，utilities 层在它之后 → 工具类正常覆盖 ✓
+ * **约定：以后我方组件样式一律写进层里，只留玻璃库那条 @import 在层外。**
+ */
+@layer components {
+  .field {
+    width: 100%;
+    border-radius: 0.95rem;
+    border: 1px solid var(--line);
+    background: var(--surface-sunken);
+    padding: 0.8rem 0.9rem;
+    color: var(--text);
+    transition: border-color 0.2s var(--ease-soft), box-shadow 0.2s var(--ease-soft);
+  }
+  .field::placeholder {
+    color: var(--text-tertiary);
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--accent);
+    /* 键盘聚焦要一眼看见：环从 34% 提到 50% */
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+}
+
+/* 跳到主要内容：键盘用户第一个 Tab 命中，聚焦前移出视口 */
+.skip-link {
+  position: fixed;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 100;
+  transform: translateY(-220%);
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-elevated);
+  color: var(--text);
+  padding: 0.6rem 1rem;
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.16s var(--ease-soft);
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+.divider {
+  height: 1px;
+  background: var(--line);
+  border: 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.pill-accent {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.pill-ok {
+  background: var(--ok-soft);
+  color: var(--ok-text);
+}
+.pill-warn {
+  background: var(--warn-soft);
+  color: var(--warn-text);
+}
+.pill-bad {
+  background: var(--bad-soft);
+  color: var(--bad-text);
+}
+.pill-muted {
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+/* 骨架屏 */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-sunken) 25%,
+    var(--line) 37%,
+    var(--surface-sunken) 63%
+  );
+  background-size: 200% 100%;
+  animation: sheen 1.4s linear infinite;
+  border-radius: 0.75rem;
+}
+:root[data-motion='off'] .skeleton {
+  animation: none;
+}
+
+/* 轻量主题过渡，不在页面祖先上使用 transform，保持 fixed 弹层坐标稳定。 */
+.app-nav-material {
+  width: min(100%, 440px);
+  margin-inline: auto;
+  background: var(--nav-surface);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  isolation: isolate;
+}
+/* 浮动玻璃底座与单个滑动透镜；高光只在交互中移动，没有常驻动画。 */
+:root {
+  --nav-surface: color-mix(in srgb, var(--bg-elevated) 84%, transparent);
+  --lens-face: rgb(255 255 255 / .44);
+  --lens-rim: rgb(255 255 255 / .92);
+  --lens-shade: rgb(24 42 72 / .16);
+  --lens-glint: rgb(255 255 255 / .55);
+}
+:root.dark {
+  --nav-surface: color-mix(in srgb, var(--bg-elevated) 72%, transparent);
+  --lens-face: rgb(198 220 255 / .14);
+  --lens-rim: rgb(240 248 255 / .72);
+  --lens-shade: rgb(4 10 24 / .36);
+  --lens-glint: rgb(235 245 255 / .28);
+}
+:root.dark[data-theme='liquid-glass-wc'] {
+  --text-secondary: rgb(242 245 251 / .82);
+  --text-tertiary: rgb(242 245 251 / .72);
+}
+.app-bottom-nav {
+  padding: 0 max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  pointer-events: none;
+}
+.app-nav-material {
+  pointer-events: auto;
+  border-color: var(--line-strong);
+  box-shadow: 0 6px 24px var(--lens-shade), inset 0 1px 0 var(--line);
+}
+/* 清掉库自带的黑色投影
+   ──────────────────────────────────────────────────────────────
+   库的 :host 里写着它**演示页**用的投影：
+     box-shadow: 0 22px 45px -12px #0005, 0 5px 12px -3px #0003;
+   那是给「浮在照片上的独立玻璃块」用的，本项目要的是贴在页面上的卡片，
+   不该带这么重的一圈黑影。
+
+   为什么一直没被发现：**在深色背景上完全看不出来**。
+   实测（纯白背景、左边中点沿法线穿过边缘）：
+     baseline        卡内 1.000 · 卡外 0.745   ← 卡外被压暗 25.5%，就是一圈黑晕
+     去掉宿主投影     卡内 1.000 · 卡外 1.000   ← 完全干净
+     折射强度=0       卡外 0.745              ← 与折射无关，确认是投影
+
+   底栏早就单独覆盖过它（见下面的 .nav-glass-stage > liquid-glass），
+   但 .refract-layer 里的卡片玻璃漏了 —— 卡片四周因此残留黑边。
+   这里统一清掉；需要阴影的地方各自按主题给（例如底栏那条 lens-shade）。
+
+   注意 `:host` 规则的特异性低于外层文档规则，所以这一条能生效，
+   不需要 !important。 */
+liquid-glass {
+  box-shadow: none;
+}
+
+/* 玻璃边框：单一均匀发丝线（用户定稿，对照参考图一：细、白、均匀、无方向性）。
+   ──────────────────────────────────────────────────────────────
+   vendor 着色器自带方向性刃光（light=dot(n,(-.7,-.9))：上沿亮、下沿暗），
+   加上宿主原有的多层描边，边框亮度沿圆周不均 —— 用户要的是一条均匀细线。
+   这里在宿主上加 ::after：经默认 slot 落进 vendor 内部（shadow 内容之上），
+   box-shadow 用 1px 内描边（清晰细线，不用模糊晕）。圆角 inherit 自宿主
+   内联 radius。数值在令牌区 --refract-line（浅 0.55 / 深 0.45）。
+   弹层面板（.refract-glass-panel）同一套语言。 */
+@layer components {
+  .refract-layer liquid-glass::after,
+  .refract-glass-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1px var(--refract-line);
+  }
+}
+
+/* 底栏只保留细高光，避免通用卡片的多层反光把它画成厚重边框。 */
+.app-nav-material.mica::before { display: none; }
+.nav-glass-stage > liquid-glass {
+  box-shadow: 0 2px 5px var(--lens-shade);
+}
+.nav-glass-stage > liquid-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.nav-timer-badge {
+  bottom: calc(100% - 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  box-shadow: 0 1px 4px var(--lens-shade);
+}
+.stats-tabs {
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--surface-sunken);
+}
+.stats-tab-selected {
+  background: var(--surface-strong);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+.stats-summary > .stat-tile { padding: 16px; }
+.stats-summary > .stat-tile > p:first-child { font-size: .75rem; color: var(--text-secondary); }
+.stats-summary > .stat-tile > p:nth-child(2) { font-size: 1.5rem; margin-block: 6px; color: var(--text); letter-spacing: -.025em; }
+.stats-summary > .stat-tile > p:last-child:not(:nth-child(2)) { color: var(--text-secondary); }
+.liquid-nav-track { isolation: isolate; }
+.liquid-nav-track { touch-action: none; user-select: none; }
+.liquid-nav-track[data-dragging] { cursor: grabbing; }
+.liquid-nav-track[data-dragging] .nav-glass-position { transition: none; }
+.liquid-nav-track[data-component-glass] .nav-glass-body { display: none; }
+/* 玻璃折射背景；图标、文字与徽标保持在唯一的固定按钮层。 */
+.nav-glass-stage { z-index: 0; inset: -64px; }
+.nav-glass-stage[data-content-ready] { z-index: 2; }
+.liquid-nav-track .nav-tab { z-index: 1; }
+.nav-glass-position {
+  position: absolute;
+  inset: 0 auto 0 0;
+  pointer-events: none;
+  transition: transform 620ms cubic-bezier(.22, 1, .36, 1);
+}
+.nav-glass-body {
+  position: absolute;
+  inset: 0 2px;
+  border-radius: 28px;
+  border: 1px solid var(--line-strong);
+  background: var(--lens-face);
+  box-shadow: inset 0 1px 0 var(--lens-glint), 0 2px 5px var(--lens-shade);
+  -webkit-backdrop-filter: blur(3px) saturate(1.7);
+  backdrop-filter: blur(3px) saturate(1.7);
+}
+.nav-glass-body::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  border-top: 1px solid var(--line);
+}
+.nav-tab { -webkit-tap-highlight-color: transparent; }
+.nav-tab[aria-current='page'] > svg { stroke-width: 2.25; }
+:root[data-motion='off'] .nav-glass-position { transition: none; }
+:root[data-blur='off'] .nav-glass-body {
+  background: var(--accent-soft);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-glass-position { transition: none; }
+}
+:root[data-blur='off'] .app-nav-material {
+  background: var(--bg-elevated);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-theme-transition='on'] :is(main, nav, .mica, [data-key-glass], button) {
+  transition: color 300ms var(--ease-soft), background-color 300ms var(--ease-soft), border-color 300ms var(--ease-soft);
+}
+:root[data-motion='on'] .refract-layer {
+  animation: glass-appear 280ms var(--ease-soft) both;
+}
+@keyframes glass-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .refract-layer { animation: none !important; }
+  :root[data-theme-transition] * { transition: none !important; }
+}
+
+/* ==========================================================================
+   透明玻璃（liquid 档）渲染底层 · 独立模糊背景层（2026-10-06）
+   ──────────────────────────────────────────────────────────────────────────
+   旧实现靠 backdrop-filter + SVG 位移滤镜，两者都要求"合成阶段回头采样背后内容"，
+   在鸿蒙 4.2 上采样时机不稳（首帧错位、模糊失效、色散被放大成彩虹边）。
+   新实现把模糊预先画在**一层独立背景图**上（绘制阶段行为），不再依赖合成阶段。
+   四层：模糊背景 / 染色 / 边框 / 内容 —— 全部由同一个容器几何决定，零像素偏移。
+   作用域仅 .glass-liquid*：不触碰液态玻璃（refract）与其它主题。
+   写在 @layer 之外（层外规则压过所有 @layer，坑 57）。
+   ========================================================================== */
+.glass-liquid {
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* 独立的合成上下文：模糊层不会把父级反复栅格化 */
+  isolation: isolate;
+}
+
+.glass-liquid__blur {
+  position: absolute;
+  /* 外扩 24px：blur 向边缘扩散时不出现透明空洞，再由容器的 overflow:hidden 裁回 */
+  inset: -24px;
+  z-index: 0;
+  pointer-events: none;
+  background-color: transparent;
+  background-image: var(--glass-bg-image, none);
+  background-repeat: no-repeat;
+  background-position: center;
+  /* 真正的模糊发生在本层自身（绘制阶段），不采样背后内容 */
+  filter: blur(var(--lg-blur-px, 14px)) saturate(var(--lg-sat, 150%));
+  /* 提示独立图层，避免与父级合并后被整体重绘 */
+  transform: translateZ(0);
+}
+
+.glass-liquid__tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  /* 半透明浅色染色：沿用现有 token，观感与旧版一致（不是不透明白色） */
+  background: rgb(var(--lg-tint-rgb, 255 255 255) / var(--lg-op, 0.3));
+}
+
+.glass-liquid--dark .glass-liquid__tint {
+  background: rgb(var(--lg-tint-rgb, 255 255 255) / calc(var(--lg-op, 0.3) * 0.6));
+}
+
+.glass-liquid__border {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  /* 边框画在容器自身：与容器同尺寸、同圆角，不做任何位移/缩放补偿 */
+  box-shadow:
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.5),
+    inset 0 1px 3px rgb(255 255 255 / 0.25);
+}
+
+.glass-liquid--dark .glass-liquid__border {
+  box-shadow:
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.22),
+    inset 0 1px 3px rgb(255 255 255 / 0.1);
+}
+
+.glass-liquid__content {
+  position: relative;
+  z-index: 3;
+}
+
+/* 透明玻璃新面板：显式拒绝任何 backdrop-filter / SVG 滤镜路径
+   ──────────────────────────────────────────────────────────
+   项目里存在 backdrop-filter: url(#liquid-glass-filter) 这类规则（旧实现遗留）。
+   那正是合成阶段回头采样的坏路径 —— 鸿蒙 4.2 上会表现为边缘彩色条纹/彩带。
+   新面板的模糊由自己的独立背景层产生，因此这里明确把 backdrop-filter 全部关掉，
+   避免旧规则再次套到新面板上（.glass-liquid 及其子树，开关用 !important 保证优先级）。
+   作用域仅 .glass-liquid*：不触碰液态玻璃（refract）与其它主题。 */
+.glass-liquid.glass-liquid-no-backdrop,
+.glass-liquid.glass-liquid-no-backdrop * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  filter: none;
+}
+/* 但模糊层自身必须保留 filter:blur —— 单独恢复它 */
+.glass-liquid.glass-liquid-no-backdrop > .glass-liquid__blur {
+  filter: blur(var(--lg-blur-px, 14px)) saturate(var(--lg-sat, 150%)) !important;
+}

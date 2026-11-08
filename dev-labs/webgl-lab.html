@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>毛玻璃 · WebGL 真法线</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', system-ui, sans-serif;
+        background: #0a0d16;
+        color: #fff;
+        overflow-x: hidden;
+      }
+
+      /* 场景背景：故意做成「有高频细节 + 强烈明暗对比 + 一条亮光带」，
+         这样折射、色散、法线光照才有东西可以作用 */
+      .scene {
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(44% 32% at 14% 12%, #3565ee 0%, transparent 62%),
+          radial-gradient(40% 30% at 88% 20%, #16bcb4 0%, transparent 62%),
+          radial-gradient(52% 42% at 54% 100%, #9146ee 0%, transparent 66%),
+          linear-gradient(158deg, #0f1731, #141d3d 52%, #0a0f22);
+      }
+      .grid {
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(to right, rgba(255, 255, 255, 0.22) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
+        background-size: 26px 26px;
+      }
+      /* 一条斜向亮光带：折射是否真实，看它透过玻璃时有没有被弯折 */
+      .beam {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(
+          102deg,
+          transparent 24%,
+          rgba(150, 195, 255, 0.55) 33%,
+          rgba(255, 255, 255, 0.9) 36%,
+          rgba(120, 170, 255, 0.5) 39%,
+          transparent 47%
+        );
+      }
+      .fine {
+        position: fixed;
+        inset: 0;
+        padding: 10px;
+        font-size: 9px;
+        line-height: 1.7;
+        color: rgba(255, 255, 255, 0.55);
+        pointer-events: none;
+      }
+
+      .wrap { position: relative; z-index: 5; padding: 16px; }
+      h1 { font-size: 15px; margin: 0 0 4px; }
+      .cap { font-size: 11px; color: rgba(255, 255, 255, 0.55); margin: 0 0 14px; line-height: 1.7; }
+      .cap b { color: rgba(255, 255, 255, 0.9); }
+
+      .stage { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+      .cell { flex: 0 0 auto; }
+      .label { font-size: 10px; color: rgba(255, 255, 255, 0.5); margin: 0 0 6px; }
+
+      /* 参考图 */
+      .refimg { width: 150px; border-radius: 26%; display: block; }
+
+      /* 每个玻璃面板的容器：canvas 覆盖在其上，指针穿透 */
+      .glassbox {
+        position: relative;
+        width: 300px;
+        height: 190px;
+        border-radius: 34px;
+        isolation: isolate;
+      }
+      .glassbox canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        pointer-events: none;
+      }
+      .glassbox .content {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        padding: 18px;
+        pointer-events: none;
+      }
+      .glassbox .big { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+      .glassbox .small { font-size: 12px; opacity: 0.8; margin-top: 3px; }
+
+      .row { display: flex; gap: 12px; align-items: flex-start; }
+    </style>
+  </head>
+  <body>
+    <div class="scene"></div>
+    <div class="grid"></div>
+    <div class="beam"></div>
+    <div class="fine">
+      背景参考文字：这段细小文字用来检验玻璃后的内容是否可辨认。网格线是最好的判据 ——
+      透过玻璃时应该被拉伸、加密或弯曲，而不是糊掉。边缘应该有明暗交替的立体结构。
+      折射应该让背景产生光学变化而不是均匀模糊。
+    </div>
+
+    <div class="wrap">
+      <h1>毛玻璃 · WebGL 真法线</h1>
+      <p class="cap">
+        直接从背景纹理采样并按 <b>SDF 法线</b>偏移，<b>完全不用 backdrop-filter</b>，
+        因此可以做到真正零模糊：<b>中心清晰、边缘拉伸弯曲、边缘有极轻 RGB 分离</b>。
+      </p>
+
+      <div class="stage">
+        <div class="cell">
+          <p class="label">参考图</p>
+          <img class="refimg" id="refimg" alt="参考" />
+        </div>
+
+        <div class="cell">
+          <p class="label">A · 薄玻璃（厚 10px / 无色散）</p>
+          <div class="glassbox" id="boxA">
+            <canvas></canvas>
+            <div class="content">
+              <div class="big">2h18m</div>
+              <div class="small">今天已学习</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="cell">
+          <p class="label">B · 标准玻璃（厚 20px / 色散 0.018）</p>
+          <div class="glassbox" id="boxB">
+            <canvas></canvas>
+            <div class="content">
+              <div class="big">3h35m</div>
+              <div class="small">课后可支配</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cell">
+          <p class="label">C · 厚玻璃 + 明显色散（厚 34px / 色散 0.04）</p>
+          <div class="glassbox" id="boxC">
+            <canvas></canvas>
+            <div class="content">
+              <div class="big">276 天</div>
+              <div class="small">距离中考</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="probe" id="probe" style="font-family: ui-monospace, monospace; font-size: 11px; line-height: 1.8; opacity: 0.8"></div>
+    </div>
+
+    <script type="module">
+      import { initGlassLab } from '/src/glass/webgl-lab.ts';
+
+      const params = new URLSearchParams(location.search);
+      const ref = params.get('ref');
+      const img = document.getElementById('refimg');
+      if (ref) img.src = ref;
+      else img.replaceWith(Object.assign(document.createElement('div'), {
+        style: 'width:150px;aspect-ratio:1;display:grid;place-items:center;background:rgba(255,255,255,.06);border-radius:26%;font-size:10px;color:rgba(255,255,255,.5)',
+        textContent: '未传入参考图',
+      }));
+
+      window.__LAB__ = initGlassLab([
+        { el: document.querySelector('#boxA'), thickness: 10, dispersionIor: 0, specular: 0.9, tint: 0.04 },
+        { el: document.querySelector('#boxB'), thickness: 20, dispersionIor: 0.018, specular: 1.0, tint: 0.04 },
+        { el: document.querySelector('#boxC'), thickness: 34, dispersionIor: 0.04, specular: 1.0, tint: 0.04 },
+      ]);
+
+      document.getElementById('probe').innerHTML =
+        'WebGL2: <b style="color:#6ee7a8">' + (window.__LAB__?.ok ? '可用，已启动' : '不可用') + '</b>' +
+        '<br>渲染器: ' + (window.__LAB__?.renderer ?? '-');
+    </script>
+  </body>
+</html>

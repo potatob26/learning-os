@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">学习 OS</string>
+    <string name="title_activity_main">学习 OS</string>
+    <string name="package_name">com.learningos.app</string>
+    <string name="custom_url_scheme">com.learningos.app</string>
+    <!-- 小组件在系统的「添加小组件」列表里显示的名字与说明 -->
+    <string name="widget_percent_label">今日自学进度</string>
+    <string name="widget_percent_desc">今天学了多久，占每日目标的百分之多少。点右上圆点换外观。</string>
+    <string name="widget_quote_label">鼓励语</string>
+    <string name="widget_quote_desc">显示一句鼓励语。点一下换下一条，点右上圆点换外观。</string>
+    <string name="widget_countdown_label">重要日期倒计时</string>
+    <string name="widget_countdown_desc">距离某个重要日期还有多少天。点一下换下一个日期，可拉大拉小，点右上圆点换外观。</string>
+</resources>

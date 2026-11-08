@@ -1,0 +1,110 @@
+apply plugin: 'com.android.application'
+
+/*
+ * 统一签名
+ * ──────────────────────────────────────────────────────────────
+ * 为什么需要它：Android 只允许**同签名**的包覆盖安装。
+ * 默认的 debug 签名来自每台机器各自的 ~/.android/debug.keystore，
+ * 换一台机器构建，签名就变了 —— 装到手机上会报
+ *   INSTALL_FAILED_UPDATE_INCOMPATIBLE: signatures do not match
+ * 用户只能先卸载（数据一起没了）才能装新的。
+ *
+ * 这里改用**项目自带的密钥库**，debug 与 release 都用它签，
+ * 于是无论在哪台机器、构建多少次，签名始终一致，
+ * 新版本都能直接覆盖安装、保留用户数据。
+ *
+ * 密钥库：android/learningos.jks（PKCS12，有效期 30 年）
+ * 该文件被 .gitignore 排除（*.jks），**但必须包含在备份里**，
+ * 一旦丢失就再也无法给已安装的包做覆盖更新了。
+ */
+def keystoreFile = rootProject.file('learningos.jks')
+/*
+ * 签名口令不写进仓库 —— 开源前收口。
+ * 本机把口令放在 android/keystore.properties（已 gitignore），
+ * CI / 别的机器用环境变量：
+ *   LEARNINGOS_STORE_PASSWORD / LEARNINGOS_KEY_ALIAS / LEARNINGOS_KEY_PASSWORD
+ * 三者缺一或密钥库不存在时，退回到 debug 签名（仍能 build，但覆盖不了已安装的正式包）。
+ */
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new java.util.Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { stream -> keystoreProps.load(stream) }
+}
+def storePasswordValue =
+    keystoreProps.getProperty('storePassword') ?: System.getenv('LEARNINGOS_STORE_PASSWORD')
+def keyAliasValue =
+    keystoreProps.getProperty('keyAlias') ?: System.getenv('LEARNINGOS_KEY_ALIAS')
+def keyPasswordValue =
+    keystoreProps.getProperty('keyPassword') ?: System.getenv('LEARNINGOS_KEY_PASSWORD')
+def canSign =
+    keystoreFile.exists() && storePasswordValue && keyAliasValue && keyPasswordValue
+
+android {
+    namespace = "com.learningos.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.learningos.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        // versionCode 必须逐次递增，否则手机无法覆盖安装新版本
+        versionCode 45
+        // 与 package.json 的版本保持一致（当前 v1.2.11）
+        versionName "1.4.3"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        // 口令来自 keystore.properties / 环境变量；没有就不配置（走默认 debug 签名）
+        if (canSign) {
+            learningos {
+                storeFile keystoreFile
+                storePassword storePasswordValue
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            if (canSign) signingConfig signingConfigs.learningos
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (canSign) signingConfig signingConfigs.learningos
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

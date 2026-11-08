@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  小组件一：今日自学百分比。
+  w_bg 是垫在最下面的白色圆角形状（运行时上色），内容全部压在它上面。
+  w_theme 是可点的主题按钮，w_root 本身在这个小组件上不可点（没有「下一条」）。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/w_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_card"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="34dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <TextView
+            android:id="@+id/w_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="10sp"
+            android:text="今日自学" />
+
+        <TextView
+            android:id="@+id/w_main"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:text="0%" />
+
+        <TextView
+            android:id="@+id/w_sub"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="10sp"
+            android:text="" />
+
+        <ProgressBar
+            android:id="@+id/w_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="6dp"
+            android:max="100"
+            android:progress="0" />
+    </LinearLayout>
+
+    <!-- 主题按钮：点击区域 36dp（可见圆点 12dp）。
+         做不到 44dp —— 2×1 的小组件内容高度本来就只有 40dp 左右，
+         44dp 会吃掉整块。这是桌面小组件与 App 内控件的客观差异，已在交接文档记录。 -->
+    <FrameLayout
+        android:id="@+id/w_theme"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="top|end"
+        android:padding="12dp">
+
+        <ImageView
+            android:id="@+id/w_theme_dot"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/widget_dot"
+            android:contentDescription="切换主题" />
+    </FrameLayout>
+</FrameLayout>

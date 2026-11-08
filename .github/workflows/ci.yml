@@ -17,15 +17,9 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
-
-      # npm optional deps bug：Windows 上生成的 lock 可能缺 Linux 原生包，
-      # 会让 CI 的 vite build 依次报 rollup / lightningcss / tailwind oxide 缺失。
-      - name: Ensure linux native binaries
-        run: |
-          npm i --no-save @rollup/rollup-linux-x64-gnu@$(node -p "require('./node_modules/rollup/package.json').version")
-          npm i --no-save lightningcss-linux-x64-gnu@$(node -p "require('./node_modules/lightningcss/package.json').version")
-          npm i --no-save @tailwindcss/oxide-linux-x64-gnu@$(node -p "require('./node_modules/@tailwindcss/oxide/package.json').version")
+        # 用 npm install 而不是 npm ci：lock 是在 Windows 上生成的，
+        # npm ci 在 Linux 上会漏装平台原生可选依赖（rollup/lightningcss/oxide）。
+        run: npm install --no-audit --no-fund
 
       - name: Typecheck
         run: npx tsc -b
